@@ -160,4 +160,6 @@ VAR BASE RELATION atencion_servicio (
 
 Dia Enum ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
 Rol Enum ("Médico", "Enfermero")
+
+Domain Matricula (^[0-9]{2}[1-5][0-9]+$)
 ```
