@@ -1,10 +1,8 @@
-<div align="center">
 
 # Trabajo práctico final integrador
 
 ### **"Facultad de Ciencia y Tecnología" UADER**
 
-</div>
 
 ---
 
