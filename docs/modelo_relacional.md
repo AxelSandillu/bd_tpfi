@@ -53,13 +53,41 @@ VAR BASE RELATION centro_de_salud (
         FOREIGN KEY(id_barrio) REFERENCES barrio
 )
 
-VAR BASE RELATION internacion (
+VAR BASE RELATION tipo_servicio (
+        nombre VARCHAR(30) NOT NULL,
+        num_enfermeros int NOT NULL,
+        num_medicos int NOT NULL,
+        PRIMARY KEY(nombre)
+)
+
+VAR BASE RELATION personal (
+        matricula VARCHAR(30) NOT NULL UNIQUE,
+        nombre VARCHAR(30) NOT NULL,
+        apellido VARCHAR(30) NOT NULL,
+        telefono VARCHAR(30) NOT NULL UNIQUE,
+        email VARCHAR(30) NOT NULL UNIQUE,
+        nacimiento datetime NOT NULL,
+        rol Rol NOT NULL,
+        PRIMARY KEY(matricula)
+)
+
+VAR BASE RELATION servicio (
         id int NOT NULL UNIQUE,
-        id_registro_hc int NOT NULL,
-        fecha_ingreso datetime NOT NULL,
-        fecha_egreso datetime,
+        id_centro_salud int NOT NULL,
+        nombre_tipo_servicio VARCHAR(30) NOT NULL,
+        matricula_encargado VARCHAR(30),
         PRIMARY KEY(id),
-        FOREIGN KEY(id_registro_hc) REFERENCES registro_hc
+        FOREIGN KEY(id_centro_salud) REFERENCES centro_de_salud,
+        FOREIGN KEY(nombre_tipo_servicio) REFERENCES tipo_servicio,
+        FOREIGN KEY(matricula_encargado) REFERENCES personal
+)
+
+VAR BASE RELATION personal_servicio (
+        id_servicio int NOT NULL,
+        matricula_personal VARCHAR(30) NOT NULL UNIQUE,
+        PRIMARY KEY(id_servicio, matricula_personal),
+        FOREIGN KEY(id_servicio) REFERENCES servicio,
+        FOREIGN KEY(matricula_personal) REFERENCES personal
 )
 
 VAR BASE RELATION registro_hc (
@@ -76,41 +104,13 @@ VAR BASE RELATION registro_hc (
         FOREIGN KEY(matricula_personal) REFERENCES personal
 )
 
-VAR BASE RELATION tipo_servicio (
-        nombre VARCHAR(30) NOT NULL,
-        num_enfermeros int NOT NULL,
-        num_medicos int NOT NULL,
-        PRIMARY KEY(nombre)
-)
-
-VAR BASE RELATION servicio (
+VAR BASE RELATION internacion (
         id int NOT NULL UNIQUE,
-        id_centro_salud int NOT NULL,
-        nombre_tipo_servicio VARCHAR(30) NOT NULL,
-        matricula_encargado VARCHAR(30),
+        id_registro_hc int NOT NULL,
+        fecha_ingreso datetime NOT NULL,
+        fecha_egreso datetime,
         PRIMARY KEY(id),
-        FOREIGN KEY(id_centro_salud) REFERENCES centro_de_salud,
-        FOREIGN KEY(nombre_tipo_servicio) REFERENCES tipo_servicio,
-        FOREIGN KEY(matricula_encargado) REFERENCES personal
-)
-
-VAR BASE RELATION personal (
-        matricula VARCHAR(30) NOT NULL UNIQUE,
-        nombre VARCHAR(30) NOT NULL,
-        apellido VARCHAR(30) NOT NULL,
-        telefono VARCHAR(30) NOT NULL UNIQUE,
-        email VARCHAR(30) NOT NULL UNIQUE,
-        nacimiento datetime NOT NULL,
-        rol tipo_rol NOT NULL,
-        PRIMARY KEY(matricula)
-)
-
-VAR BASE RELATION personal_servicio (
-        id_servicio int NOT NULL,
-        matricula_personal VARCHAR(30) NOT NULL UNIQUE,
-        PRIMARY KEY(id_servicio, matricula_personal),
-        FOREIGN KEY(id_servicio) REFERENCES servicio,
-        FOREIGN KEY(matricula_personal) REFERENCES personal
+        FOREIGN KEY(id_registro_hc) REFERENCES registro_hc
 )
 
 VAR BASE RELATION especialidad (
