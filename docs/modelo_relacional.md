@@ -121,7 +121,7 @@ VAR BASE RELATION especialidad (
 VAR BASE RELATION especializado_en (
         matricula_personal VARCHAR(30) NOT NULL UNIQUE,
         nombre_especialidad VARCHAR(30) NOT NULL,
-        PRIMARY KEY(matricula_personal, id_especialidad),
+        PRIMARY KEY(matricula_personal, nombre_especialidad),
         FOREIGN KEY(matricula_personal) REFERENCES personal,
         FOREIGN KEY(nombre_especialidad) REFERENCES especialidad
 )
@@ -129,7 +129,7 @@ VAR BASE RELATION especializado_en (
 VAR BASE RELATION especialidad_requerida (
         nombre_tipo_servicio VARCHAR(30) NOT NULL,
         nombre_especialidad VARCHAR(30) NOT NULL,
-        PRIMARY KEY(nombre_tipo_servicio, nombre_tipo_servicio),
+        PRIMARY KEY(nombre_tipo_servicio, nombre_especialidad),
         FOREIGN KEY(nombre_tipo_servicio) REFERENCES tipo_servicio,
         FOREIGN KEY(nombre_especialidad) REFERENCES especialidad
 )
