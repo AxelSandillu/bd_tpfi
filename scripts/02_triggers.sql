@@ -1,6 +1,5 @@
 -- Trigger: Inaguración del centro de salúd.
 -- Descripción: Verifica que la fecha de inauguración sea anterior a hoy
-
 CREATE OR REPLACE FUNCTION fnc_centro_de_salud_inauguracion () RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
       IF NEW.inaguracion >= CURRENT_DATE THEN
@@ -18,7 +17,6 @@ EXECUTE FUNCTION fnc_centro_de_salud_inauguracion ();
 
 -- Trigger: Fecha de naciminto del paciente.
 -- Descripción: Verifica que la fecha de nacimiento sea anterior a  hoy
-
 CREATE OR REPLACE FUNCTION fnc_nacimiento () RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
       IF NEW.nacimiento >= CURRENT_DATE THEN
@@ -36,7 +34,6 @@ EXECUTE FUNCTION fnc_nacimiento ();
 
 -- Trigger: Nacimiento del personal
 -- Descripción: Verifica que la fecha de nacimiento sea anterior a hoy.
-
 CREATE TRIGGER trg_personal_nacimiento BEFORE INSERT
 OR
 UPDATE ON personal FOR EACH ROW
@@ -44,7 +41,6 @@ EXECUTE FUNCTION fnc_nacimiento ();
 
 -- Trigger: Validar datos de personal.
 -- Descripción: Verifica que el telefono, email y edad sean validos.
-
 CREATE OR REPLACE FUNCTION fnc_personal_validar_datos () RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
       -- 1. Validar formato de email
@@ -73,7 +69,6 @@ EXECUTE FUNCTION fnc_personal_validar_datos ();
 
 -- Trigger: trg_servicio_personal_encargado
 -- Descripción: Verifica que el personal a cargo sea un médico.
-
 CREATE OR REPLACE FUNCTION fnc_servicio_personal_encargado () RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
       IF NOT EXISTS (
@@ -96,7 +91,6 @@ EXECUTE FUNCTION fnc_servicio_personal_encargado ();
 
 -- Trigger: trg_servicio_centro_unico
 -- Descripción: Verifica que en cada centro de salud no haya más de un servicio de un mismo tipo.
-
 CREATE OR REPLACE FUNCTION fnc_servicio_centro_unico () RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
       IF EXISTS (
@@ -118,7 +112,6 @@ EXECUTE FUNCTION fnc_servicio_centro_unico ();
 
 -- Trigger: trg_registro_hc_encargado
 -- Descripción: Verifica que el medico que lo atendió trabaje en el servicio utilizado y sea un medico.
-
 CREATE OR REPLACE FUNCTION fnc_registro_hc_encargado () RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
       IF NOT EXISTS (
@@ -140,7 +133,6 @@ EXECUTE FUNCTION fnc_registro_hc_encargado ();
 
 -- Trigger: trg_internacion_ingreso
 -- Descripción: La fecha de ingreso debe coincidir con la fecha cargada en el registro.
-
 CREATE OR REPLACE FUNCTION fnc_internacion_ingreso () RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
       IF NEW.fecha_ingreso <> (SELECT fecha FROM registro_hc WHERE id_registro = NEW.id_registro) THEN
@@ -156,11 +148,26 @@ OR
 UPDATE ON internacion FOR EACH ROW
 EXECUTE FUNCTION fnc_internacion_ingreso ();
 
+-- Trigger: trg_internacion_egreso
+-- Descripción: La fecha de egreso debe ser posterior  a la de ingreso.
+CREATE OR REPLACE FUNCTION fnc_internacion_ingreso () RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+      IF NEW.fecha_ingreso <=  NEW.fecha_egreso THEN
+            RAISE EXCEPTION 'La fecha de egreso no puede ser anterior a la de ingreso';
+      END IF;
+
+      RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_internacion_ingreso BEFORE INSERT
+OR
+UPDATE ON internacion FOR EACH ROW
+EXECUTE FUNCTION fnc_internacion_ingreso ();
 
 -- TRIGGER: trg_personal_servicio_max_personal
 -- Descripción: Verifica que no se pase de la cantidad máxima de médicos y enfermeros según su tipo de servicio.
-
-CREATE OR REPLACE FUNCTION func_personal_servicio_max_personal() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION fnc_personal_servicio_max_personal () RETURNS TRIGGER AS $$
 DECLARE
       v_rol Rol;
       v_max_medicos INT;
@@ -202,14 +209,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_personal_servicio_max_personal
-BEFORE INSERT ON personal_servicio
-FOR EACH ROW EXECUTE PROCEDURE func_personal_servicio_max_personal();
+CREATE TRIGGER trg_personal_servicio_max_personal BEFORE INSERT ON personal_servicio FOR EACH ROW
+EXECUTE PROCEDURE fnc_personal_servicio_max_personal ();
 
 -- TRIGGER: trg_personal_servicio_especialidad
 -- Descripción: Verifica que todo el personal tenga las especialidades requeridas para el servicio.
-
-CREATE OR REPLACE FUNCTION func_personal_servicio_especialidad() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION fnc_personal_servicio_especialidad () RETURNS TRIGGER AS $$
 DECLARE
       v_esp_faltante VARCHAR(30);
 BEGIN
@@ -233,14 +238,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_personal_servicio_especialidad
-BEFORE INSERT ON personal_servicio
-FOR EACH ROW EXECUTE PROCEDURE func_personal_servicio_especialidad();
+CREATE TRIGGER trg_personal_servicio_especialidad BEFORE INSERT ON personal_servicio FOR EACH ROW
+EXECUTE PROCEDURE fnc_personal_servicio_especialidad ();
 
 -- TRIGGER: trg_personal_servicio_superposición
 -- Descripción: Verifica que un mismo miembro del personal no trabaje en varios servicios en el mismo horario.
-
-CREATE OR REPLACE FUNCTION func_personal_servicio_superposicion() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION fnc_personal_servicio_superposicion () RETURNS TRIGGER AS $$
 DECLARE
       v_conflicto INT;
 BEGIN
@@ -265,31 +268,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_personal_servicio_superposición
-BEFORE INSERT ON personal_servicio
-FOR EACH ROW EXECUTE PROCEDURE func_personal_servicio_superposicion();
-
--- TRIGGER: trg_internacion_ingreso
--- Descripción: La fecha de ingreso debe coincidir con la fecha cargada en el registro de historia clínica asociado.
-
-CREATE OR REPLACE FUNCTION func_internacion_ingreso() RETURNS TRIGGER AS $$
-DECLARE
-      v_fecha_visita TIMESTAMP;
-BEGIN
-      -- Obtener la fecha de la visita del registro de historia clínica asociado
-      SELECT dia_visita INTO v_fecha_visita
-      FROM registro_hc
-      WHERE id = NEW.id_registro_hc;
-
-      -- Verificar coincidencia
-      IF NEW.fecha_ingreso <> v_fecha_visita THEN
-            RAISE EXCEPTION 'La fecha de ingreso no coincide con la fecha cargada en el registro de historia clínica asociado.';
-      END IF;
-
-      RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_internacion_ingreso
-BEFORE INSERT OR UPDATE ON internacion
-FOR EACH ROW EXECUTE PROCEDURE func_internacion_ingreso();
+CREATE TRIGGER trg_personal_servicio_superposición BEFORE INSERT ON personal_servicio FOR EACH ROW
+EXECUTE PROCEDURE fnc_personal_servicio_superposicion ();
