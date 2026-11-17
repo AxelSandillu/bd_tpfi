@@ -150,20 +150,20 @@ EXECUTE FUNCTION fnc_internacion_ingreso ();
 
 -- Trigger: trg_internacion_egreso
 -- Descripción: La fecha de egreso debe ser posterior  a la de ingreso.
-CREATE OR REPLACE FUNCTION fnc_internacion_ingreso () RETURNS TRIGGER LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION fnc_internacion_egreso () RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-      IF NEW.fecha_ingreso <=  NEW.fecha_egreso THEN
-            RAISE EXCEPTION 'La fecha de egreso no puede ser anterior a la de ingreso';
+      IF NEW.fecha_egreso IS NOT NULL AND NEW.fecha_egreso < NEW.fecha_ingreso THEN
+            RAISE EXCEPTION 'La fecha de egreso (%) no puede ser anterior a la de ingreso (%)', NEW.fecha_egreso, NEW.fecha_ingreso;
       END IF;
 
       RETURN NEW;
 END;
 $$;
 
-CREATE TRIGGER trg_internacion_ingreso BEFORE INSERT
+CREATE TRIGGER trg_internacion_egreso BEFORE INSERT
 OR
 UPDATE ON internacion FOR EACH ROW
-EXECUTE FUNCTION fnc_internacion_ingreso ();
+EXECUTE FUNCTION fnc_internacion_egreso ();
 
 -- TRIGGER: trg_personal_servicio_max_personal
 -- Descripción: Verifica que no se pase de la cantidad máxima de médicos y enfermeros según su tipo de servicio.
