@@ -3,11 +3,11 @@
 -- Verifica que la fecha de inauguración sea anterior a hoy
 CREATE OR REPLACE FUNCTION fnc_centro_de_salud_inauguracion () RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-  IF NEW.inaguracion >= CURRENT_DATE THEN
-    RAISE EXCEPTION 'La fecha de inaguración debe ser estrictamente anterior a hoy (%)', CURRENT_DATE;
-  END IF;
-  
-  RETURN NEW; 
+    IF NEW.inaguracion >= CURRENT_DATE THEN
+        RAISE EXCEPTION 'La fecha de inaguración debe ser estrictamente anterior a hoy (%)', CURRENT_DATE;
+    END IF;
+    
+    RETURN NEW; 
 END;
 $$;
 
@@ -25,7 +25,7 @@ BEGIN
     RAISE EXCEPTION 'La fecha de nacimineto del paciente debe ser anterior a la actual (%)', CURRENT_DATE;
   END IF;
   
-  RETURN NEW; 
+  RETURN NEW;
 END;
 $$;
 
