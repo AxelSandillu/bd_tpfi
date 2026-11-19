@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS obra_social (
 
 -- Tabla: Paciente
 CREATE TABLE IF NOT EXISTS paciente (
-  dni INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  dni INT PRIMARY KEY,
   id_obra_social INT,
   nombre VARCHAR(30) NOT NULL,
   apellido VARCHAR(30) NOT NULL,
