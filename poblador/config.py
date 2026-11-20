@@ -89,3 +89,45 @@ URL_OVERPASS = "https://overpass-api.de/api/interpreter"
 # --- Archivos y fuentes ---
 RUTA_TIPOS_SERVICIO = "data/tipos_servicio.json"
 RUTA_SALIDA = "02_seed.sql"
+
+# --- Geografía ---
+PROVINCIA_ENTRE_RIOS = 30  # código INDEC de Entre Ríos en Georef
+GEOREF_ENDPOINT_DEPARTAMENTOS = "/v1/departamentos"
+GEOREF_ENDPOINT_LOCALIDADES = "/v1/localidades"
+GEOREF_ENDPOINT_CALLES = "/v1/calles"
+GEOREF_MIN_RESULTADOS = 5  # umbral mínimo para considerar que la API respondió bien
+OVERPASS_QUERY_BARRIOS = (
+    '[out:json][timeout:25];'
+    'area["name"="Entre Ríos"]->.a;'
+    '(node["place"~"suburb|neighbourhood|quarter"](area.a);'
+    'way["place"~"suburb|neighbourhood|quarter"](area.a););'
+    'out center tags;'
+)
+
+# --- Obras sociales (~50 nombres, máximo 30 caracteres cada uno) ---
+OBRAS_SOCIALES = [
+    "OSDE", "Swiss Medical", "Galeno", "Omint", "Medicus",
+    "Hospital Italiano", "Hospital Británico", "Fundación Favaloro",
+    "Austral", "Cemic", "IOMA", "PAMI", "Obera", "OSPERA", "OSPES",
+    "OSPEL", "OSSEG", "OSPYBS", "OSECAC", "OSPCBA", "OSPICON",
+    "OSPAD", "OSPE", "OSPREN", "OSPIB", "OSPOM", "OSPCL",
+    "OSPCA", "OSPCH", "OSPCR", "OSPDA", "OSPDE",
+    "OSPDI", "OSPDR", "OSPFE", "OSPGA", "OSPGR",
+    "OSPGU", "OSPHU", "OSPJA", "OSPJU", "OSPLP", "OSPLR",
+    "OSPLU", "OSPMA", "OSPME", "OSPMI", "OSPMO", "OSPMP",
+    "OSPSA",
+]
+# (50 obras sociales)
+
+# --- Catálogo de nombres de centros de salud (UNIQUE, máximo 30 caracteres) ---
+CENTROS_SALUD_PATRON = (
+    "Centro de Salud {zona}",
+    "Centro de Salud {zona} {numero}",
+    "Centro Municipal de Salud {zona}",
+    "Centro Comunitario de Salud {zona}",
+)
+CENTROS_SALUD_ZONAS = [
+    "Norte", "Sur", "Este", "Oeste", "Central", "Nuevo",
+    "Villa", "Barrio", "Pueblo", "Ciudad",
+]
+CENTROS_SALUD_NUMEROS = list(range(1, 100))
