@@ -12,7 +12,7 @@ import random
 
 import pytest
 
-from generadores.pools import Pool, PoolAgotadoError, Pools
+from pools import Pool, PoolAgotadoError, Pools
 
 
 # ---------------------------------------------------------------------------

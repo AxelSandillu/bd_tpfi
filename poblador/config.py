@@ -86,6 +86,12 @@ URL_GEOREF = "https://apis.datos.gob.ar/georef"
 # Overpass API (OpenStreetMap) para barrios de Entre Ríos.
 URL_OVERPASS = "https://overpass-api.de/api/interpreter"
 
+# --- Días de la semana (para horario_atencion) ---
+DIAS_SEMANA = [
+    "Lunes", "Martes", "Miércoles", "Jueves",
+    "Viernes", "Sábado", "Domingo",
+]
+
 # --- Archivos y fuentes ---
 RUTA_TIPOS_SERVICIO = "data/tipos_servicio.json"
 RUTA_SALIDA = "02_seed.sql"
