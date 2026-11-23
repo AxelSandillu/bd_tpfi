@@ -52,6 +52,7 @@ from config import (
     TOTALES,
     VENTANA_VISITAS_ANIOS,
 )
+
 # _instante y _hora son utilidades internas de validar.py (parseo de fechas y
 # horas); se reutilizan para que ambos módulos lean las fechas igual.
 from validar import CLAVES_FORANEAS, DIAS, Violacion, _hora, _instante, validar
@@ -62,6 +63,7 @@ ROL_MEDICO = "Médico"
 # ---------------------------------------------------------------------------
 # Resultado y error
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Resultado:
@@ -87,8 +89,13 @@ class ReparacionFallida(Exception):
             diagnóstico; NO debe usarse para emitir el SQL).
     """
 
-    def __init__(self, mensaje: str, violaciones: list[Violacion], iteraciones: int,
-                 parcial: Resultado):
+    def __init__(
+        self,
+        mensaje: str,
+        violaciones: list[Violacion],
+        iteraciones: int,
+        parcial: Resultado,
+    ):
         super().__init__(mensaje)
         self.violaciones = violaciones
         self.iteraciones = iteraciones
@@ -99,9 +106,13 @@ class ReparacionFallida(Exception):
 # Contexto de trabajo
 # ---------------------------------------------------------------------------
 
+
 def _hoy() -> date:
     import config
-    return config.FECHA_REFERENCIA if config.FECHA_REFERENCIA is not None else date.today()
+
+    return (
+        config.FECHA_REFERENCIA if config.FECHA_REFERENCIA is not None else date.today()
+    )
 
 
 class _Ctx:
@@ -132,9 +143,12 @@ class _Ctx:
 
 # --- índices (se recalculan al usarlos: las tablas son chicas) -----------------
 
+
 def _registros_por_id(ctx: _Ctx) -> dict:
     """{id: fila}. Sin columna `id`, el id es la posición (1-based), igual que en el validador."""
-    return {r.get("id", pos): r for pos, r in enumerate(ctx.filas("registro_hc"), start=1)}
+    return {
+        r.get("id", pos): r for pos, r in enumerate(ctx.filas("registro_hc"), start=1)
+    }
 
 
 def _proximo_id_registro(ctx: _Ctx):
@@ -151,7 +165,10 @@ def _proximo_id(ctx: _Ctx, tabla: str) -> int:
 
 def _interna_por_servicio(ctx: _Ctx) -> dict:
     tipos = {t["nombre"]: t.get("interna", False) for t in ctx.filas("tipo_servicio")}
-    return {s["id"]: tipos.get(s["nombre_tipo_servicio"], False) for s in ctx.filas("servicio")}
+    return {
+        s["id"]: tipos.get(s["nombre_tipo_servicio"], False)
+        for s in ctx.filas("servicio")
+    }
 
 
 def _medicos_por_servicio(ctx: _Ctx) -> dict:
@@ -200,20 +217,36 @@ def _se_superpone(intervalos: list, inicio: date, fin: date) -> bool:
 # resuelta (agregando filas, o porque un arreglo anterior ya la resolvió) y
 # False si no hay forma de resolverla sin modificar o borrar.
 
+
 def _reparar_especialidades_requeridas(ctx: _Ctx, v: Violacion) -> bool:
     ps = ctx.filas("personal_servicio")[v.fila]
-    tipo = next((s["nombre_tipo_servicio"] for s in ctx.filas("servicio")
-                 if s["id"] == ps["id_servicio"]), None)
+    tipo = next(
+        (
+            s["nombre_tipo_servicio"]
+            for s in ctx.filas("servicio")
+            if s["id"] == ps["id_servicio"]
+        ),
+        None,
+    )
     if tipo is None:
         return False
-    requeridas = {er["nombre_especialidad"] for er in ctx.filas("especialidad_requerida")
-                  if er["nombre_tipo_servicio"] == tipo}
-    tiene = {ee["nombre_especialidad"] for ee in ctx.filas("especializado_en")
-             if ee["matricula_personal"] == ps["matricula_personal"]}
+    requeridas = {
+        er["nombre_especialidad"]
+        for er in ctx.filas("especialidad_requerida")
+        if er["nombre_tipo_servicio"] == tipo
+    }
+    tiene = {
+        ee["nombre_especialidad"]
+        for ee in ctx.filas("especializado_en")
+        if ee["matricula_personal"] == ps["matricula_personal"]
+    }
     for esp in sorted(requeridas - tiene):
         ctx.agregar(
             "especializado_en",
-            {"matricula_personal": ps["matricula_personal"], "nombre_especialidad": esp},
+            {
+                "matricula_personal": ps["matricula_personal"],
+                "nombre_especialidad": esp,
+            },
             f"se otorga {esp!r} a {ps['matricula_personal']} (la exige el servicio "
             f"{ps['id_servicio']}, tipo {tipo})",
         )
@@ -234,8 +267,11 @@ def _reparar_fk_especialidad(ctx: _Ctx, v: Violacion) -> bool:
         if valor is None or valor in existentes:
             continue
         if ref_tabla == "especialidad" and isinstance(valor, str):
-            ctx.agregar("especialidad", {"nombre": valor},
-                        f"se agrega la especialidad {valor!r} que referencia {tabla}.{columna}")
+            ctx.agregar(
+                "especialidad",
+                {"nombre": valor},
+                f"se agrega la especialidad {valor!r} que referencia {tabla}.{columna}",
+            )
         else:
             resuelta = False
     return resuelta
@@ -244,8 +280,11 @@ def _reparar_fk_especialidad(ctx: _Ctx, v: Violacion) -> bool:
 def _horarios_que_cubren(ctx: _Ctx, id_servicio, instante) -> list[dict]:
     """Horarios aún no vinculados al servicio que sirven para esa visita."""
     dia = DIAS[instante.weekday()]
-    vinculados = {a["id_horario"] for a in ctx.filas("atencion_servicio")
-                  if a["id_servicio"] == id_servicio}
+    vinculados = {
+        a["id_horario"]
+        for a in ctx.filas("atencion_servicio")
+        if a["id_servicio"] == id_servicio
+    }
     con_hora = instante.time() != time.min
     out = []
     for h in sorted(ctx.filas("horario_atencion"), key=lambda h: h["id"]):
@@ -253,7 +292,11 @@ def _horarios_que_cubren(ctx: _Ctx, id_servicio, instante) -> list[dict]:
             continue
         if con_hora:
             apertura, cierre = _hora(h["apertura"]), _hora(h["cierre"])
-            if apertura is None or cierre is None or not (apertura <= instante.time() <= cierre):
+            if (
+                apertura is None
+                or cierre is None
+                or not (apertura <= instante.time() <= cierre)
+            ):
                 continue
         out.append(h)
     return out
@@ -268,7 +311,11 @@ def _visita_cubierta(ctx: _Ctx, id_servicio, instante) -> bool:
         if not con_hora:
             return True
         apertura, cierre = _hora(h["apertura"]), _hora(h["cierre"])
-        if apertura is not None and cierre is not None and apertura <= instante.time() <= cierre:
+        if (
+            apertura is not None
+            and cierre is not None
+            and apertura <= instante.time() <= cierre
+        ):
             return True
     return False
 
@@ -306,6 +353,7 @@ _REPARADORES = {
 # Completar conteos que quedaron por debajo del objetivo del Excel
 # ---------------------------------------------------------------------------
 
+
 def _completar_personal_servicio(ctx: _Ctx) -> None:
     objetivo = ctx.objetivos.get("personal_servicio")
     if objetivo is None:
@@ -325,10 +373,14 @@ def _completar_personal_servicio(ctx: _Ctx) -> None:
     )
     requeridas: dict = {}
     for er in ctx.filas("especialidad_requerida"):
-        requeridas.setdefault(er["nombre_tipo_servicio"], set()).add(er["nombre_especialidad"])
+        requeridas.setdefault(er["nombre_tipo_servicio"], set()).add(
+            er["nombre_especialidad"]
+        )
     especialidades: dict = {}
     for ee in ctx.filas("especializado_en"):
-        especialidades.setdefault(ee["matricula_personal"], set()).add(ee["nombre_especialidad"])
+        especialidades.setdefault(ee["matricula_personal"], set()).add(
+            ee["nombre_especialidad"]
+        )
     servicios = ctx.filas("servicio")
 
     agregados = 0
@@ -339,10 +391,13 @@ def _completar_personal_servicio(ctx: _Ctx) -> None:
         opciones = []
         for s in servicios:
             tipo = tipos.get(s["nombre_tipo_servicio"])
-            if tipo is None or cantidad[(s["id"], persona["rol"])] >= tipo.get(campo, 0):
+            if tipo is None or cantidad[(s["id"], persona["rol"])] >= tipo.get(
+                campo, 0
+            ):
                 continue
             sin_tener = requeridas.get(tipo["nombre"], set()) - especialidades.get(
-                persona["matricula"], set())
+                persona["matricula"], set()
+            )
             opciones.append((len(sin_tener), ctx.rng.random(), s, sin_tener))
         if not opciones:
             continue
@@ -351,7 +406,10 @@ def _completar_personal_servicio(ctx: _Ctx) -> None:
         for esp in sorted(sin_tener):
             ctx.agregar(
                 "especializado_en",
-                {"matricula_personal": persona["matricula"], "nombre_especialidad": esp},
+                {
+                    "matricula_personal": persona["matricula"],
+                    "nombre_especialidad": esp,
+                },
                 f"se otorga {esp!r} a {persona['matricula']} para asignarla al servicio "
                 f"{servicio['id']}",
             )
@@ -372,16 +430,22 @@ def _completar_atencion_servicio(ctx: _Ctx) -> None:
     faltan = objetivo - len(ctx.filas("atencion_servicio"))
     if faltan <= 0:
         return
-    existentes = {(a["id_servicio"], a["id_horario"]) for a in ctx.filas("atencion_servicio")}
+    existentes = {
+        (a["id_servicio"], a["id_horario"]) for a in ctx.filas("atencion_servicio")
+    }
     candidatos = [
         (s["id"], h["id"])
-        for s in ctx.filas("servicio") for h in ctx.filas("horario_atencion")
+        for s in ctx.filas("servicio")
+        for h in ctx.filas("horario_atencion")
         if (s["id"], h["id"]) not in existentes
     ]
     ctx.rng.shuffle(candidatos)
     for id_servicio, id_horario in candidatos[:faltan]:
-        ctx.agregar("atencion_servicio", {"id_servicio": id_servicio, "id_horario": id_horario},
-                    f"el servicio {id_servicio} suma el horario {id_horario}")
+        ctx.agregar(
+            "atencion_servicio",
+            {"id_servicio": id_servicio, "id_horario": id_horario},
+            f"el servicio {id_servicio} suma el horario {id_horario}",
+        )
 
 
 def _completar_especializado_en(ctx: _Ctx) -> None:
@@ -409,9 +473,11 @@ def _completar_especializado_en(ctx: _Ctx) -> None:
                 continue
             esp = ctx.rng.choice(libres)
             tiene.setdefault(matricula, set()).add(esp)
-            ctx.agregar("especializado_en",
-                        {"matricula_personal": matricula, "nombre_especialidad": esp},
-                        f"se otorga {esp!r} a {matricula} como especialidad adicional")
+            ctx.agregar(
+                "especializado_en",
+                {"matricula_personal": matricula, "nombre_especialidad": esp},
+                f"se otorga {esp!r} a {matricula} como especialidad adicional",
+            )
             faltan -= 1
             progreso = True
         if not progreso:
@@ -420,27 +486,45 @@ def _completar_especializado_en(ctx: _Ctx) -> None:
 
 # --- registros e internaciones ------------------------------------------------
 
+
 def _servicios_con_medico_y_horario(ctx: _Ctx, solo_interna: bool) -> list[dict]:
     medicos = _medicos_por_servicio(ctx)
     horarios = _horarios_por_servicio(ctx)
     interna = _interna_por_servicio(ctx)
-    return [s for s in ctx.filas("servicio")
-            if medicos.get(s["id"]) and horarios.get(s["id"]) and (interna[s["id"]] or not solo_interna)]
+    return [
+        s
+        for s in ctx.filas("servicio")
+        if medicos.get(s["id"])
+        and horarios.get(s["id"])
+        and (interna[s["id"]] or not solo_interna)
+    ]
 
 
 def _caso_para(ctx: _Ctx, servicio: dict):
     """(diagnostico, tratamiento) coherente con el tipo del servicio, o None."""
-    tipo = next((t for t in ctx.filas("tipo_servicio")
-                 if t["nombre"] == servicio["nombre_tipo_servicio"]), None)
+    tipo = next(
+        (
+            t
+            for t in ctx.filas("tipo_servicio")
+            if t["nombre"] == servicio["nombre_tipo_servicio"]
+        ),
+        None,
+    )
     if tipo is not None and tipo.get("casos"):
         caso = ctx.rng.choice(tipo["casos"])
         return caso["diagnostico"], caso["tratamiento"]
     # Sin catálogo de casos en las tablas: se reutiliza un par que ya exista
     # en un registro de un servicio del mismo tipo.
-    mismos = {s["id"] for s in ctx.filas("servicio")
-              if s["nombre_tipo_servicio"] == servicio["nombre_tipo_servicio"]}
-    pares = [(r["diagnostico"], r["tratamiento"]) for r in ctx.filas("registro_hc")
-             if r["id_servicio"] in mismos]
+    mismos = {
+        s["id"]
+        for s in ctx.filas("servicio")
+        if s["nombre_tipo_servicio"] == servicio["nombre_tipo_servicio"]
+    }
+    pares = [
+        (r["diagnostico"], r["tratamiento"])
+        for r in ctx.filas("registro_hc")
+        if r["id_servicio"] in mismos
+    ]
     return ctx.rng.choice(pares) if pares else None
 
 
@@ -450,10 +534,18 @@ def _armar_registro(ctx: _Ctx, servicios: list[dict], reciente: bool):
     servicio = rng.choice(servicios)
     horario = rng.choice(_horarios_por_servicio(ctx)[servicio["id"]])
     paciente = rng.choice(ctx.filas("paciente"))
-    centro = next((c for c in ctx.filas("centro_de_salud")
-                   if c["id"] == servicio["id_centro_salud"]), None)
-    nacimiento, inauguracion = _instante(paciente.get("nacimiento")), (
-        _instante(centro.get("inaguracion")) if centro else None)
+    centro = next(
+        (
+            c
+            for c in ctx.filas("centro_de_salud")
+            if c["id"] == servicio["id_centro_salud"]
+        ),
+        None,
+    )
+    nacimiento, inauguracion = (
+        _instante(paciente.get("nacimiento")),
+        (_instante(centro.get("inaguracion")) if centro else None),
+    )
     if nacimiento is None or inauguracion is None:
         return None
 
@@ -464,11 +556,17 @@ def _armar_registro(ctx: _Ctx, servicios: list[dict], reciente: bool):
         desde = hoy - timedelta(days=365 * VENTANA_VISITAS_ANIOS)
         hasta = hoy - timedelta(days=1)
     # Estrictamente posterior a la inauguración y al nacimiento.
-    desde = max(desde, inauguracion.date() + timedelta(days=1),
-                nacimiento.date() + timedelta(days=1))
+    desde = max(
+        desde,
+        inauguracion.date() + timedelta(days=1),
+        nacimiento.date() + timedelta(days=1),
+    )
     dia = DIAS.index(horario["dia"])
-    fechas = [desde + timedelta(days=d) for d in range((hasta - desde).days + 1)
-              if (desde + timedelta(days=d)).weekday() == dia]
+    fechas = [
+        desde + timedelta(days=d)
+        for d in range((hasta - desde).days + 1)
+        if (desde + timedelta(days=d)).weekday() == dia
+    ]
     caso = _caso_para(ctx, servicio)
     if not fechas or caso is None:
         return None
@@ -496,15 +594,21 @@ def _completar_registros(ctx: _Ctx) -> None:
     if not servicios or not ctx.filas("paciente"):
         return
     intentos = 0
-    while len(ctx.filas("registro_hc")) < objetivo and intentos < MAX_INTENTOS_ELEMENTO_NUEVO * 10:
+    while (
+        len(ctx.filas("registro_hc")) < objetivo
+        and intentos < MAX_INTENTOS_ELEMENTO_NUEVO * 10
+    ):
         intentos += 1
         armado = _armar_registro(ctx, servicios, reciente=False)
         if armado is None:
             continue
         fila, fecha, dni = armado
-        ctx.agregar("registro_hc", fila,
-                    f"visita nueva del {fila['dia_visita']} (servicio {fila['id_servicio']}, "
-                    f"paciente {dni})")
+        ctx.agregar(
+            "registro_hc",
+            fila,
+            f"visita nueva del {fila['dia_visita']} (servicio {fila['id_servicio']}, "
+            f"paciente {dni})",
+        )
 
 
 def _duracion_pasada(ctx: _Ctx, fecha: date):
@@ -519,9 +623,12 @@ def _duracion_pasada(ctx: _Ctx, fecha: date):
 def _agregar_internacion(ctx: _Ctx, id_registro, fecha_ingreso, egreso, dni) -> None:
     ctx.agregar(
         "internacion",
-        {"id": _proximo_id(ctx, "internacion"), "id_registro_hc": id_registro,
-         "fecha_ingreso": fecha_ingreso,
-         "fecha_egreso": egreso.isoformat() if egreso else None},
+        {
+            "id": _proximo_id(ctx, "internacion"),
+            "id_registro_hc": id_registro,
+            "fecha_ingreso": fecha_ingreso,
+            "fecha_egreso": egreso.isoformat() if egreso else None,
+        },
         f"internación {'actual' if egreso is None else 'pasada'} del paciente {dni} "
         f"sobre el registro {id_registro}",
     )
@@ -532,8 +639,11 @@ def _internacion_sobre_registro_existente(ctx: _Ctx, actual: bool) -> bool:
     internados = {n["id_registro_hc"] for n in ctx.filas("internacion")}
     interna = _interna_por_servicio(ctx)
     intervalos = _intervalos_por_paciente(ctx)
-    candidatos = [(i, r) for i, r in sorted(_registros_por_id(ctx).items(), key=lambda x: str(x[0]))
-                  if i not in internados and interna.get(r["id_servicio"], False)]
+    candidatos = [
+        (i, r)
+        for i, r in sorted(_registros_por_id(ctx).items(), key=lambda x: str(x[0]))
+        if i not in internados and interna.get(r["id_servicio"], False)
+    ]
     ctx.rng.shuffle(candidatos)
     for id_registro, r in candidatos:
         visita = _instante(r.get("dia_visita"))
@@ -541,8 +651,11 @@ def _internacion_sobre_registro_existente(ctx: _Ctx, actual: bool) -> bool:
             continue
         fecha = visita.date()
         if actual:
-            if not (ctx.hoy - timedelta(days=INTERNACION_ACTUAL_DIAS[1]) <= fecha
-                    <= ctx.hoy - timedelta(days=INTERNACION_ACTUAL_DIAS[0])):
+            if not (
+                ctx.hoy - timedelta(days=INTERNACION_ACTUAL_DIAS[1])
+                <= fecha
+                <= ctx.hoy - timedelta(days=INTERNACION_ACTUAL_DIAS[0])
+            ):
                 continue
             egreso, fin = None, date.max
         else:
@@ -552,7 +665,9 @@ def _internacion_sobre_registro_existente(ctx: _Ctx, actual: bool) -> bool:
             fin = egreso
         if _se_superpone(intervalos.get(r["dni_paciente"], []), fecha, fin):
             continue
-        _agregar_internacion(ctx, id_registro, r["dia_visita"], egreso, r["dni_paciente"])
+        _agregar_internacion(
+            ctx, id_registro, r["dia_visita"], egreso, r["dni_paciente"]
+        )
         return True
     return False
 
@@ -577,9 +692,12 @@ def _internacion_con_registro_nuevo(ctx: _Ctx, actual: bool) -> bool:
             fin = egreso
         if _se_superpone(intervalos.get(dni, []), fecha, fin):
             continue
-        ctx.agregar("registro_hc", fila,
-                    f"visita nueva del {fila['dia_visita']} para poder internar al "
-                    f"paciente {dni} (servicio {fila['id_servicio']})")
+        ctx.agregar(
+            "registro_hc",
+            fila,
+            f"visita nueva del {fila['dia_visita']} para poder internar al "
+            f"paciente {dni} (servicio {fila['id_servicio']})",
+        )
         id_registro = fila.get("id", len(ctx.filas("registro_hc")))
         _agregar_internacion(ctx, id_registro, fila["dia_visita"], egreso, dni)
         return True
@@ -592,10 +710,15 @@ def _completar_internaciones(ctx: _Ctx) -> None:
     filas = ctx.filas("internacion")
     n_actuales = sum(1 for n in filas if n.get("fecha_egreso") is None)
     n_pasadas = len(filas) - n_actuales
-    for actual, faltan in ((True, ctx.actuales - n_actuales), (False, ctx.pasadas - n_pasadas)):
+    for actual, faltan in (
+        (True, ctx.actuales - n_actuales),
+        (False, ctx.pasadas - n_pasadas),
+    ):
         for _ in range(max(0, faltan)):
-            if not (_internacion_sobre_registro_existente(ctx, actual)
-                    or _internacion_con_registro_nuevo(ctx, actual)):
+            if not (
+                _internacion_sobre_registro_existente(ctx, actual)
+                or _internacion_con_registro_nuevo(ctx, actual)
+            ):
                 break
 
 
@@ -605,12 +728,15 @@ def _completar_conteos(ctx: _Ctx) -> None:
     _completar_atencion_servicio(ctx)
     _completar_especializado_en(ctx)
     _completar_registros(ctx)
-    _completar_internaciones(ctx)  # al final: puede reutilizar los registros recién agregados
+    _completar_internaciones(
+        ctx
+    )  # al final: puede reutilizar los registros recién agregados
 
 
 # ---------------------------------------------------------------------------
 # Punto de entrada
 # ---------------------------------------------------------------------------
+
 
 def reparar(
     tablas: dict[str, list[dict]],
@@ -640,8 +766,12 @@ def reparar(
     ctx = _Ctx(
         tablas,
         objetivos,
-        INTERNACIONES_ACTUALES if internaciones_actuales is None else internaciones_actuales,
-        INTERNACIONES_PASADAS if internaciones_pasadas is None else internaciones_pasadas,
+        INTERNACIONES_ACTUALES
+        if internaciones_actuales is None
+        else internaciones_actuales,
+        INTERNACIONES_PASADAS
+        if internaciones_pasadas is None
+        else internaciones_pasadas,
         random.Random(SEED if seed is None else seed),
         hoy if hoy is not None else _hoy(),
     )
@@ -667,7 +797,10 @@ def reparar(
             if violaciones:
                 raise ReparacionFallida(
                     _mensaje_fallo(violaciones, iteracion, tope, agotado=False),
-                    violaciones, iteracion, resultado(iteracion))
+                    violaciones,
+                    iteracion,
+                    resultado(iteracion),
+                )
             return resultado(iteracion)
 
     violaciones = validar(ctx.t, hoy=ctx.hoy)
@@ -675,20 +808,29 @@ def reparar(
         return resultado(tope)
     raise ReparacionFallida(
         _mensaje_fallo(violaciones, tope, tope, agotado=True),
-        violaciones, tope, resultado(tope))
+        violaciones,
+        tope,
+        resultado(tope),
+    )
 
 
-def _mensaje_fallo(violaciones: list[Violacion], iteraciones: int, tope: int,
-                   agotado: bool) -> str:
-    causa = (f"se agotó el tope de {tope} iteraciones" if agotado
-             else f"la iteración {iteraciones} no pudo avanzar")
+def _mensaje_fallo(
+    violaciones: list[Violacion], iteraciones: int, tope: int, agotado: bool
+) -> str:
+    causa = (
+        f"se agotó el tope de {tope} iteraciones"
+        if agotado
+        else f"la iteración {iteraciones} no pudo avanzar"
+    )
     grupos: dict = {}
     for v in violaciones:
         grupos.setdefault((v.regla, v.tabla), []).append(v)
     lineas = [
-        f"No se pudo reparar: {causa} y quedan {len(violaciones)} violaciones "
-        f"sin resolver. El reparador solo agrega filas (nunca borra ni modifica), "
-        f"por eso estas hay que corregirlas en el generador que las produjo:"
+        (
+            f"No se pudo reparar: {causa} y quedan {len(violaciones)} violaciones "
+            f"sin resolver. El reparador solo agrega filas (nunca borra ni modifica), "
+            f"por eso estas hay que corregirlas en el generador que las produjo:"
+        )
     ]
     for (regla, tabla), vs in sorted(grupos.items()):
         lineas.append(f"  - {regla} en {tabla}: {len(vs)} fila(s)")
@@ -703,6 +845,7 @@ def _mensaje_fallo(violaciones: list[Violacion], iteraciones: int, tope: int,
 # ---------------------------------------------------------------------------
 # Reporte final
 # ---------------------------------------------------------------------------
+
 
 def reporte(
     tablas: dict[str, list[dict]],
@@ -730,17 +873,23 @@ def reporte(
             continue
         total_excel += excel
         dif = generado - excel
-        lineas.append(f"{nombre:<{ancho}}  {excel:>7}  {generado:>9}  "
-                      f"{('0' if dif == 0 else f'{dif:+d}'):>6}")
+        lineas.append(
+            f"{nombre:<{ancho}}  {excel:>7}  {generado:>9}  "
+            f"{('0' if dif == 0 else f'{dif:+d}'):>6}"
+        )
     dif_total = total_generado - total_excel
     lineas.append("-" * len(lineas[0]))
-    lineas.append(f"{'Total':<{ancho}}  {total_excel:>7}  {total_generado:>9}  "
-                  f"{('0' if dif_total == 0 else f'{dif_total:+d}'):>6}")
+    lineas.append(
+        f"{'Total':<{ancho}}  {total_excel:>7}  {total_generado:>9}  "
+        f"{('0' if dif_total == 0 else f'{dif_total:+d}'):>6}"
+    )
 
     internaciones = tablas.get("internacion") or []
     if internaciones:
         actuales = sum(1 for n in internaciones if n.get("fecha_egreso") is None)
-        lineas.append(f"Internaciones: {actuales} actuales + {len(internaciones) - actuales} pasadas")
+        lineas.append(
+            f"Internaciones: {actuales} actuales + {len(internaciones) - actuales} pasadas"
+        )
     if agregadas:
         detalle = ", ".join(f"{t} +{n}" for t, n in sorted(agregadas.items()))
         lineas.append(f"Filas agregadas por la reparación: {detalle}")
