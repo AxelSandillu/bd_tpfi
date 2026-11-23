@@ -26,6 +26,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from config import (
+    DIAS_SEMANA,
     SEED,
     TOTALES,
     VENTANA_VISITAS_ANIOS,
@@ -64,16 +65,27 @@ def _dia_siguiente(dia_objetivo: str, desde: date) -> date:
 
 def _fecha_aleatoria_dentro_ventana(
     fecha_minima: date,
+    dia_semana: int,
     rng: random.Random,
 ) -> date:
-    """Fecha aleatoria dentro de la ventana de visitas, anterior a hoy."""
+    """Elige una fecha del día de semana indicado, entre fecha_minima y ayer."""
     hoy = _hoy()
     inicio = max(fecha_minima, hoy - timedelta(days=365 * VENTANA_VISITAS_ANIOS))
     fin = hoy - timedelta(days=1)
-    if fin < inicio:
-        return inicio
-    dias = (fin - inicio).days
-    return inicio + timedelta(days=rng.randint(0, dias))
+    if inicio > fin:
+        raise ValueError(
+            f"No existe una fecha válida anterior a hoy ({hoy}) posterior a "
+            f"la fecha mínima ({fecha_minima})."
+        )
+
+    primer_dia = inicio + timedelta(days=(dia_semana - inicio.weekday()) % 7)
+    if primer_dia > fin:
+        raise ValueError(
+            f"No hay fechas disponibles para el día de semana {dia_semana} "
+            f"entre {inicio} y {fin}."
+        )
+    cantidad = ((fin - primer_dia).days // 7) + 1
+    return primer_dia + timedelta(days=7 * rng.randrange(cantidad))
 
 
 def _fecha_reciente(rng: random.Random) -> date:
@@ -154,11 +166,10 @@ def generar_registro_hc(
     if not servicios_validos:
         return registros
 
-    def _crear_registro(servicio: dict, fecha: date) -> dict:
+    def _crear_registro(servicio: dict, fecha: date, paciente: int) -> dict:
         tipo = tipos_por_nombre[servicio["nombre_tipo_servicio"]]
         caso = rng.choice(tipo["casos"])
         medico = rng.choice(medicos_por_servicio[servicio["id"]])
-        paciente = rng.choice(dnis_pacientes)
 
         return {
             "id_servicio": servicio["id"],
@@ -175,31 +186,56 @@ def generar_registro_hc(
         fecha_nac = nacimientos_por_dni[paciente_dni]
         fecha_min = max(fecha_inag, fecha_nac,
                         hoy - timedelta(days=365 * VENTANA_VISITAS_ANIOS))
-        fecha = _fecha_aleatoria_dentro_ventana(fecha_min, rng)
-        fecha = _dia_siguiente(horario["dia"], fecha)
-        if fecha < fecha_inag or fecha < fecha_nac:
-            fecha = _dia_siguiente(horario["dia"], max(fecha_inag, fecha_nac))
-        return fecha
+        dia_semana = DIAS_SEMANA.index(horario["dia"])
+        return _fecha_aleatoria_dentro_ventana(fecha_min, dia_semana, rng)
 
-    # 1. Primero los registros de internaciones actuales (fechas recientes)
-    for _ in range(n_actuales):
-        servicio = rng.choice(servicios_validos)
-        h_list = horarios_por_servicio[servicio["id"]]
-        horario = rng.choice(h_list)
-        paciente = rng.choice(dnis_pacientes)
+    # 1. Primero los registros de internaciones actuales (fechas recientes).
+    #    Van en servicios que internan (tipo con interna=true) y con pacientes
+    #    distintos entre sí, para que el issue de internaciones pueda armar
+    #    las 40 actuales sin superposiciones.
+    interna_por_tipo = {t["nombre"]: t.get("interna", False) for t in tipo_servicio}
+    servicios_que_internan = [
+        s for s in servicios_validos
+        if interna_por_tipo.get(s["nombre_tipo_servicio"], False)
+    ] or servicios_validos  # sin tipos que internan, no se restringe
+
+    pacientes_actuales = list(dnis_pacientes)
+    rng.shuffle(pacientes_actuales)
+    desde_reciente = hoy - timedelta(days=INTERNACION_ACTUAL_DIAS[1])
+    hasta_reciente = hoy - timedelta(days=INTERNACION_ACTUAL_DIAS[0])
+
+    intentos = 0
+    n_registros_actuales = 0
+    while n_registros_actuales < n_actuales and intentos < n_actuales * 50:
+        intentos += 1
+        servicio = rng.choice(servicios_que_internan)
+        horario = rng.choice(horarios_por_servicio[servicio["id"]])
         centro = centros_por_id[servicio["id_centro_salud"]]
         fecha_inag = date.fromisoformat(centro["inaguracion"][:10])
+
+        # Paciente distinto en cada registro actual (se repone si se acaban).
+        if not pacientes_actuales:
+            pacientes_actuales = list(dnis_pacientes)
+            rng.shuffle(pacientes_actuales)
+        paciente = pacientes_actuales.pop()
         fecha_nac = nacimientos_por_dni[paciente]
-        fecha_min = max(fecha_inag, fecha_nac, hoy - timedelta(days=20))
-        fecha = _fecha_reciente(rng)
-        if fecha < fecha_min:
-            fecha = fecha_min
-        fecha = _dia_siguiente(horario["dia"], fecha)
-        # No superar hoy
-        if fecha >= hoy:
-            fecha = hoy - timedelta(days=1)
-            fecha = _dia_siguiente(horario["dia"], fecha_min)
-        registros.append(_crear_registro(servicio, fecha))
+
+        # Fechas del día de la semana del horario, dentro de la ventana
+        # reciente, anteriores a hoy y posteriores a inauguración y nacimiento.
+        fecha_min = max(desde_reciente, fecha_inag, fecha_nac)
+        dia_semana = DIAS_SEMANA.index(horario["dia"])  # 0 = Lunes
+        candidatas = [
+            f for f in (
+                desde_reciente + timedelta(days=i)
+                for i in range((hasta_reciente - desde_reciente).days + 1)
+            )
+            if f >= fecha_min and f.weekday() == dia_semana
+        ]
+        if not candidatas:
+            continue
+        fecha = rng.choice(candidatas)
+        registros.append(_crear_registro(servicio, fecha, paciente))
+        n_registros_actuales += 1
 
     # 2. El resto (750 - 40 = 710) con fechas en ventana de visitas
     while len(registros) < cantidad:
@@ -208,7 +244,7 @@ def generar_registro_hc(
         horario = rng.choice(h_list)
         paciente = rng.choice(dnis_pacientes)
         fecha = _fecha_valida(horario, centros_por_id[servicio["id_centro_salud"]], paciente)
-        registros.append(_crear_registro(servicio, fecha))
+        registros.append(_crear_registro(servicio, fecha, paciente))
 
     return registros[:cantidad]
 
@@ -256,6 +292,14 @@ def generar_registro_hc_completo(
     if datos_json is None:
         datos_json = _cargar_tipos_servicio()
 
+    # tipo_servicio de la estructura clínica no trae los `casos` (viven solo
+    # en el JSON): se los agregamos por nombre sin modificar los originales.
+    casos_por_tipo = {t["nombre"]: t["casos"] for t in datos_json["tipos_servicio"]}
+    tipo_servicio = [
+        {**t, "casos": casos_por_tipo[t["nombre"]]}
+        for t in datos_estructura["tipo_servicio"]
+    ]
+
     registros = generar_registro_hc(
         servicios=datos_estructura["servicio"],
         personal_servicio=datos_estructura["personal_servicio"],
@@ -264,7 +308,7 @@ def generar_registro_hc_completo(
         atencion_servicio=datos_estructura["atencion_servicio"],
         pacientes=datos_pacientes,
         centros_de_salud=datos_geografia["centro_de_salud"],
-        tipo_servicio=datos_estructura["tipo_servicio"],
+        tipo_servicio=tipo_servicio,
         rng=rng,
     )
 

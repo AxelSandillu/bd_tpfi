@@ -82,14 +82,19 @@ AREAS_TELEFONICAS = {
 
 # --- URLs de APIs públicas ---
 URL_RANDOMUSER = "https://randomuser.me/api/"
-URL_GEOREF = "https://apis.datos.gob.ar/georef"
+URL_GEOREF = "https://apis.datos.gob.ar/georef/api/v2.0"
 # Overpass API (OpenStreetMap) para barrios de Entre Ríos.
 URL_OVERPASS = "https://overpass-api.de/api/interpreter"
 
 # --- Días de la semana (para horario_atencion) ---
 DIAS_SEMANA = [
-    "Lunes", "Martes", "Miércoles", "Jueves",
-    "Viernes", "Sábado", "Domingo",
+    "Lunes",
+    "Martes",
+    "Miércoles",
+    "Jueves",
+    "Viernes",
+    "Sábado",
+    "Domingo",
 ]
 
 # --- Archivos y fuentes ---
@@ -98,29 +103,69 @@ RUTA_SALIDA = "02_seed.sql"
 
 # --- Geografía ---
 PROVINCIA_ENTRE_RIOS = 30  # código INDEC de Entre Ríos en Georef
-GEOREF_ENDPOINT_DEPARTAMENTOS = "/v1/departamentos"
-GEOREF_ENDPOINT_LOCALIDADES = "/v1/localidades"
-GEOREF_ENDPOINT_CALLES = "/v1/calles"
+GEOREF_ENDPOINT_DEPARTAMENTOS = "/departamentos"
+GEOREF_ENDPOINT_LOCALIDADES = "/localidades"
+GEOREF_ENDPOINT_CALLES = "/calles"
 GEOREF_MIN_RESULTADOS = 5  # umbral mínimo para considerar que la API respondió bien
 OVERPASS_QUERY_BARRIOS = (
-    '[out:json][timeout:25];'
+    "[out:json][timeout:25];"
     'area["name"="Entre Ríos"]->.a;'
     '(node["place"~"suburb|neighbourhood|quarter"](area.a);'
     'way["place"~"suburb|neighbourhood|quarter"](area.a););'
-    'out center tags;'
+    "out center tags;"
 )
 
 # --- Obras sociales (~50 nombres, máximo 30 caracteres cada uno) ---
 OBRAS_SOCIALES = [
-    "OSDE", "Swiss Medical", "Galeno", "Omint", "Medicus",
-    "Hospital Italiano", "Hospital Británico", "Fundación Favaloro",
-    "Austral", "Cemic", "IOMA", "PAMI", "Obera", "OSPERA", "OSPES",
-    "OSPEL", "OSSEG", "OSPYBS", "OSECAC", "OSPCBA", "OSPICON",
-    "OSPAD", "OSPE", "OSPREN", "OSPIB", "OSPOM", "OSPCL",
-    "OSPCA", "OSPCH", "OSPCR", "OSPDA", "OSPDE",
-    "OSPDI", "OSPDR", "OSPFE", "OSPGA", "OSPGR",
-    "OSPGU", "OSPHU", "OSPJA", "OSPJU", "OSPLP", "OSPLR",
-    "OSPLU", "OSPMA", "OSPME", "OSPMI", "OSPMO", "OSPMP",
+    "OSDE",
+    "Swiss Medical",
+    "Galeno",
+    "Omint",
+    "Medicus",
+    "Hospital Italiano",
+    "Hospital Británico",
+    "Fundación Favaloro",
+    "Austral",
+    "Cemic",
+    "IOMA",
+    "PAMI",
+    "Obera",
+    "OSPERA",
+    "OSPES",
+    "OSPEL",
+    "OSSEG",
+    "OSPYBS",
+    "OSECAC",
+    "OSPCBA",
+    "OSPICON",
+    "OSPAD",
+    "OSPE",
+    "OSPREN",
+    "OSPIB",
+    "OSPOM",
+    "OSPCL",
+    "OSPCA",
+    "OSPCH",
+    "OSPCR",
+    "OSPDA",
+    "OSPDE",
+    "OSPDI",
+    "OSPDR",
+    "OSPFE",
+    "OSPGA",
+    "OSPGR",
+    "OSPGU",
+    "OSPHU",
+    "OSPJA",
+    "OSPJU",
+    "OSPLP",
+    "OSPLR",
+    "OSPLU",
+    "OSPMA",
+    "OSPME",
+    "OSPMI",
+    "OSPMO",
+    "OSPMP",
     "OSPSA",
 ]
 # (50 obras sociales)
@@ -133,7 +178,20 @@ CENTROS_SALUD_PATRON = (
     "Centro Comunitario de Salud {zona}",
 )
 CENTROS_SALUD_ZONAS = [
-    "Norte", "Sur", "Este", "Oeste", "Central", "Nuevo",
-    "Villa", "Barrio", "Pueblo", "Ciudad",
+    "Norte",
+    "Sur",
+    "Este",
+    "Oeste",
+    "Central",
+    "Nuevo",
+    "Villa",
+    "Barrio",
+    "Pueblo",
+    "Ciudad",
 ]
 CENTROS_SALUD_NUMEROS = list(range(1, 100))
+
+# --- Reparación (reparar.py) ---
+MAX_ITERACIONES_REPARACION = 10  # tope del bucle validar -> reparar
+MAX_INTENTOS_ELEMENTO_NUEVO = 200  # sorteos para armar un registro/internación nuevo
+EJEMPLOS_POR_REGLA_EN_MENSAJE = 3  # filas de ejemplo por regla al abortar

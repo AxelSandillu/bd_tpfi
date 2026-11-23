@@ -200,6 +200,8 @@ def test_atencion_servicio_160():
     horarios = generar_horario_atencion(rng)
     acs = generar_atencion_servicio(svc, horarios, rng)
     assert len(acs) == 160
+    pares = {(a["id_servicio"], a["id_horario"]) for a in acs}
+    assert len(pares) == 160, "No debe repetirse servicio + horario"
 
 
 # ---------------------------------------------------------------------------
@@ -318,3 +320,37 @@ def test_misma_seed_mismo_resultado():
     )
 
     assert r1 == r2
+
+
+def test_especializado_en_determinista_entre_procesos():
+    """La salida no debe depender del hash aleatorio de cada proceso Python."""
+    import os
+    import subprocess
+    import sys
+
+    script = r"""
+import json
+import runpy
+ns = runpy.run_path("tests/test_estructura_clinica.py")
+r = ns["generar_estructura_clinica"](
+    seed=42,
+    personal=list(ns["PERSONAL_MINIMO"]),
+    centros=ns["CENTROS_MINIMO"],
+    datos_json=ns["DATOS_JSON_MINIMO"],
+)
+print(json.dumps(r["especializado_en"], ensure_ascii=False, sort_keys=True))
+"""
+    salidas = []
+    for hash_seed in ("1", "2"):
+        entorno = os.environ.copy()
+        entorno["PYTHONHASHSEED"] = hash_seed
+        proceso = subprocess.run(
+            [sys.executable, "-c", script],
+            check=True,
+            capture_output=True,
+            text=True,
+            env=entorno,
+        )
+        salidas.append(proceso.stdout)
+
+    assert salidas[0] == salidas[1]
