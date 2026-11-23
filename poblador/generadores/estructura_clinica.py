@@ -231,24 +231,31 @@ def generar_atencion_servicio(
     horarios: list[dict],
     rng: random.Random,
 ) -> list[dict]:
-    """160 filas (id_servicio, id_horario), ~2,3 por servicio."""
+    """Genera pares (servicio, horario) únicos hasta el total configurado."""
     cantidad = TOTALES["atencion_servicio"]
-    atencion = []
+    if not servicios or not horarios:
+        return []
+
     id_horarios = [h["id"] for h in horarios]
+    capacidad = len(servicios) * len(id_horarios)
+    if cantidad > capacidad:
+        raise ValueError(
+            f"No se pueden generar {cantidad} atenciones únicas: "
+            f"solo hay {capacidad} combinaciones servicio-horario disponibles"
+        )
 
-    # ~2,3 horarios por servicio distribuidos
-    base = cantidad // len(servicios)
-    sobrante = cantidad % len(servicios)
-
+    # Distribución equilibrada: cada servicio recibe 2 o 3 horarios, sin repetir.
+    base, sobrante = divmod(cantidad, len(servicios))
+    atencion = []
     for i, servicio in enumerate(servicios):
         n = base + (1 if i < sobrante else 0)
-        for _ in range(n):
-            atencion.append({
-                "id_servicio": servicio["id"],
-                "id_horario": rng.choice(id_horarios),
-            })
+        seleccionados = rng.sample(id_horarios, n)
+        atencion.extend(
+            {"id_servicio": servicio["id"], "id_horario": id_horario}
+            for id_horario in seleccionados
+        )
 
-    return atencion[:cantidad]
+    return atencion
 
 
 # ---------------------------------------------------------------------------
@@ -266,161 +273,103 @@ def generar_personal_servicio_y_especializado_en(
 ) -> tuple[list[dict], list[dict]]:
     """150 personal_servicio + especializado_en derivado.
 
-    Reglas:
-    - Primero un médico por servicio (encargado)
-    - Luego completar hasta cupos (num_medicos/num_enfermeros por tipo)
-    - Máximo 150 total, 100 médicos, 200 enfermeros
-    - Cada persona en un solo servicio
-    - A cada persona se le otorgan las especialidades requeridas que falten
-    - Armado de especialidad más escasa a más abundante
+    Respeta por separado los cupos de médicos y enfermeros de cada servicio.
+    Cada persona se asigna como máximo a un servicio.
     """
     cantidad_personal_servicio = TOTALES["personal_servicio"]
-    n_medicos_total = 100  # config.MEDICOS
-    n_enfermeros_total = 200  # config.ENFERMEROS
+    n_medicos_total = TOTALES.get("personal_medicos", 100)
+    n_enfermeros_total = TOTALES.get("personal_enfermeros", 200)
 
-    # Indexar tipos por nombre
     tipos_por_nombre = {t["nombre"]: t for t in tipo_servicio}
-
-    # Contar cuántos servicios requieren cada especialidad (escasez)
     especialidad_en_servicios = defaultdict(int)
     for er in especialidad_requerida:
         especialidad_en_servicios[er["nombre_especialidad"]] += 1
 
-    # Ordenar servicios por especialidad requerida más escasa primero
-    def escasez_servicio(s):
-        tipo = tipos_por_nombre.get(s["nombre_tipo_servicio"])
+    def escasez_servicio(servicio):
+        tipo = tipos_por_nombre.get(servicio["nombre_tipo_servicio"])
         if not tipo:
             return 0
-        esps = tipo.get("especialidades_requeridas", [])
-        if not esps:
-            return 999
-        return min(especialidad_en_servicios.get(e, 0) for e in esps)
+        requeridas = tipo.get("especialidades_requeridas", [])
+        return min(
+            (especialidad_en_servicios.get(e, 0) for e in requeridas),
+            default=999,
+        )
 
     servicios_ordenados = sorted(servicios, key=escasez_servicio)
-
-    # Separar personal por rol
     medicos = [p for p in personal if p["rol"] == "Médico"]
     enfermeros = [p for p in personal if p["rol"] == "Enfermero"]
     rng.shuffle(medicos)
     rng.shuffle(enfermeros)
 
-    # Contadores de asignados
-    medicos_asignados = 0
-    enfermeros_asignados = 0
-
-    # Registro de qué especialidades tiene cada persona (para no duplicar)
-    especialidades_por_persona: dict[str, set[str]] = defaultdict(set)
-
-    # Contar cuántas especialidades requiere cada servicio
-    especialidades_requeridas_por_tipo: dict[str, list[str]] = {}
-    for t in tipo_servicio:
-        especialidades_requeridas_por_tipo[t["nombre"]] = list(
-            t.get("especialidades_requeridas", [])
-        )
-
-    # Asignar personal a servicios
     personal_servicio = []
-    servicios_completados = 0
+    especialidades_por_persona: dict[str, set[str]] = defaultdict(set)
+    asignados_por_servicio: dict[int, dict[str, int]] = defaultdict(
+        lambda: {"Médico": 0, "Enfermero": 0}
+    )
+    matriculas_asignadas = set()
 
+    def asignar(servicio, persona, rol):
+        matricula = persona["matricula"]
+        personal_servicio.append({
+            "id_servicio": servicio["id"],
+            "matricula_personal": matricula,
+        })
+        matriculas_asignadas.add(matricula)
+        asignados_por_servicio[servicio["id"]][rol] += 1
+        tipo = tipos_por_nombre[servicio["nombre_tipo_servicio"]]
+        especialidades_por_persona[matricula].update(
+            tipo.get("especialidades_requeridas", [])
+        )
+        return matricula
+
+    # Fase 1: asegurar un médico encargado por servicio, dentro de su cupo.
     for servicio in servicios_ordenados:
         if len(personal_servicio) >= cantidad_personal_servicio:
             break
-
-        tipo_nombre = servicio["nombre_tipo_servicio"]
-        tipo = tipos_por_nombre[tipo_nombre]
-        cupo_medicos = tipo["num_medicos"]
-        cupo_enfermeros = tipo["num_enfermeros"]
-        req_esps = especialidades_requeridas_por_tipo[tipo_nombre]
-
-        # 1. Un médico por servicio (encargado)
-        if medicos_asignados < n_medicos_total and medicos:
+        tipo = tipos_por_nombre[servicio["nombre_tipo_servicio"]]
+        if tipo["num_medicos"] < 1:
+            continue
+        if medicos:
             medico = medicos.pop()
-            personal_servicio.append({
-                "id_servicio": servicio["id"],
-                "matricula_personal": medico["matricula"],
-            })
-            servicio["matricula_encargado"] = medico["matricula"]
-            medicos_asignados += 1
-            # Otorgar especialidades requeridas al médico
-            for esp in req_esps:
-                if esp not in especialidades_por_persona[medico["matricula"]]:
-                    especialidades_por_persona[medico["matricula"]].add(esp)
+            matricula = asignar(servicio, medico, "Médico")
+            servicio["matricula_encargado"] = matricula
 
-        # 2. Completar cupos de enfermeros
+    # Fase 2: completar primero los cupos de enfermería, nunca superarlos.
+    for servicio in servicios_ordenados:
+        tipo = tipos_por_nombre[servicio["nombre_tipo_servicio"]]
         while (
             len(personal_servicio) < cantidad_personal_servicio
-            and enfermeros_asignados < n_enfermeros_total
             and enfermeros
-            and sum(
-                1 for ps in personal_servicio
-                if ps["id_servicio"] == servicio["id"]
-            ) < cupo_medicos + cupo_enfermeros
+            and asignados_por_servicio[servicio["id"]]["Enfermero"] < tipo["num_enfermeros"]
         ):
-            enfermero = enfermeros.pop()
-            personal_servicio.append({
-                "id_servicio": servicio["id"],
-                "matricula_personal": enfermero["matricula"],
-            })
-            enfermeros_asignados += 1
-            for esp in req_esps:
-                if esp not in especialidades_por_persona[enfermero["matricula"]]:
-                    especialidades_por_persona[enfermero["matricula"]].add(esp)
+            asignar(servicio, enfermeros.pop(), "Enfermero")
 
-        servicios_completados += 1
+    # Fase 3: completar los cupos médicos restantes.
+    for servicio in servicios_ordenados:
+        tipo = tipos_por_nombre[servicio["nombre_tipo_servicio"]]
+        while (
+            len(personal_servicio) < cantidad_personal_servicio
+            and medicos
+            and asignados_por_servicio[servicio["id"]]["Médico"] < tipo["num_medicos"]
+        ):
+            asignar(servicio, medicos.pop(), "Médico")
 
-    # Si no alcanzamos 150, intentar con médicos restantes
-    while (
-        len(personal_servicio) < cantidad_personal_servicio
-        and medicos_asignados < n_medicos_total
-        and medicos
-    ):
-        # Buscar un servicio con cupo de médico disponible
-        for servicio in servicios:
-            tipo = tipos_por_nombre[servicio["nombre_tipo_servicio"]]
-            actual_medicos = sum(
-                1 for ps in personal_servicio
-                if ps["id_servicio"] == servicio["id"]
-                and any(p["matricula"] == ps["matricula_personal"] and p["rol"] == "Médico"
-                        for p in personal)
-            )
-            # Simplificado: asignar a servicios con menos de cupo total
-            actual_total = sum(1 for ps in personal_servicio if ps["id_servicio"] == servicio["id"])
-            if actual_total < tipo["num_medicos"] + tipo["num_enfermeros"]:
-                medico = medicos.pop()
-                personal_servicio.append({
-                    "id_servicio": servicio["id"],
-                    "matricula_personal": medico["matricula"],
-                })
-                medicos_asignados += 1
-                for esp in tipo.get("especialidades_requeridas", []):
-                    if esp not in especialidades_por_persona[medico["matricula"]]:
-                        especialidades_por_persona[medico["matricula"]].add(esp)
-                break
-        else:
-            break
+    # Fase 4: si aún falta personal, completar cupos de enfermería disponibles.
+    for servicio in servicios_ordenados:
+        tipo = tipos_por_nombre[servicio["nombre_tipo_servicio"]]
+        while (
+            len(personal_servicio) < cantidad_personal_servicio
+            and enfermeros
+            and asignados_por_servicio[servicio["id"]]["Enfermero"] < tipo["num_enfermeros"]
+        ):
+            asignar(servicio, enfermeros.pop(), "Enfermero")
 
-    # Si aún faltan, usar enfermeros restantes
-    while (
-        len(personal_servicio) < cantidad_personal_servicio
-        and enfermeros_asignados < n_enfermeros_total
-        and enfermeros
-    ):
-        for servicio in servicios:
-            tipo = tipos_por_nombre[servicio["nombre_tipo_servicio"]]
-            actual_total = sum(1 for ps in personal_servicio if ps["id_servicio"] == servicio["id"])
-            if actual_total < tipo["num_medicos"] + tipo["num_enfermeros"]:
-                enfermero = enfermeros.pop()
-                personal_servicio.append({
-                    "id_servicio": servicio["id"],
-                    "matricula_personal": enfermero["matricula"],
-                })
-                enfermeros_asignados += 1
-                for esp in tipo.get("especialidades_requeridas", []):
-                    if esp not in especialidades_por_persona[enfermero["matricula"]]:
-                        especialidades_por_persona[enfermero["matricula"]].add(esp)
-                break
-        else:
-            break
+    if len(personal_servicio) != cantidad_personal_servicio:
+        raise ValueError(
+            f"No fue posible asignar {cantidad_personal_servicio} personas respetando "
+            f"los cupos por servicio; se asignaron {len(personal_servicio)}. "
+            "Revisá los cupos de data/tipos_servicio.json."
+        )
 
     # ------------------------------------------------------------------
     # 7. especializado_en: completar hasta 320
@@ -446,7 +395,10 @@ def generar_personal_servicio_y_especializado_en(
 
     # Primero las otorgadas por servicios (obligatorias por trigger)
     for matricula, esps in especialidades_por_persona.items():
-        for esp in esps:
+        # Los set no garantizan un orden estable entre procesos de Python:
+        # PYTHONHASHSEED puede cambiarlo aunque la semilla del generador sea igual.
+        # Ordenar evita que el SQL alterne las filas de una misma persona.
+        for esp in sorted(esps):
             if len(especializado_en) >= objetivo:
                 break
             _agregar_ee(matricula, esp)

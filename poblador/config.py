@@ -82,7 +82,7 @@ AREAS_TELEFONICAS = {
 
 # --- URLs de APIs públicas ---
 URL_RANDOMUSER = "https://randomuser.me/api/"
-URL_GEOREF = "https://apis.datos.gob.ar/georef"
+URL_GEOREF = "https://apis.datos.gob.ar/georef/api/v2.0"
 # Overpass API (OpenStreetMap) para barrios de Entre Ríos.
 URL_OVERPASS = "https://overpass-api.de/api/interpreter"
 
@@ -103,9 +103,9 @@ RUTA_SALIDA = "02_seed.sql"
 
 # --- Geografía ---
 PROVINCIA_ENTRE_RIOS = 30  # código INDEC de Entre Ríos en Georef
-GEOREF_ENDPOINT_DEPARTAMENTOS = "/v1/departamentos"
-GEOREF_ENDPOINT_LOCALIDADES = "/v1/localidades"
-GEOREF_ENDPOINT_CALLES = "/v1/calles"
+GEOREF_ENDPOINT_DEPARTAMENTOS = "/departamentos"
+GEOREF_ENDPOINT_LOCALIDADES = "/localidades"
+GEOREF_ENDPOINT_CALLES = "/calles"
 GEOREF_MIN_RESULTADOS = 5  # umbral mínimo para considerar que la API respondió bien
 OVERPASS_QUERY_BARRIOS = (
     "[out:json][timeout:25];"

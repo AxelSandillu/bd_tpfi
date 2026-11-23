@@ -65,16 +65,27 @@ def _dia_siguiente(dia_objetivo: str, desde: date) -> date:
 
 def _fecha_aleatoria_dentro_ventana(
     fecha_minima: date,
+    dia_semana: int,
     rng: random.Random,
 ) -> date:
-    """Fecha aleatoria dentro de la ventana de visitas, anterior a hoy."""
+    """Elige una fecha del día de semana indicado, entre fecha_minima y ayer."""
     hoy = _hoy()
     inicio = max(fecha_minima, hoy - timedelta(days=365 * VENTANA_VISITAS_ANIOS))
     fin = hoy - timedelta(days=1)
-    if fin < inicio:
-        return inicio
-    dias = (fin - inicio).days
-    return inicio + timedelta(days=rng.randint(0, dias))
+    if inicio > fin:
+        raise ValueError(
+            f"No existe una fecha válida anterior a hoy ({hoy}) posterior a "
+            f"la fecha mínima ({fecha_minima})."
+        )
+
+    primer_dia = inicio + timedelta(days=(dia_semana - inicio.weekday()) % 7)
+    if primer_dia > fin:
+        raise ValueError(
+            f"No hay fechas disponibles para el día de semana {dia_semana} "
+            f"entre {inicio} y {fin}."
+        )
+    cantidad = ((fin - primer_dia).days // 7) + 1
+    return primer_dia + timedelta(days=7 * rng.randrange(cantidad))
 
 
 def _fecha_reciente(rng: random.Random) -> date:
@@ -175,11 +186,8 @@ def generar_registro_hc(
         fecha_nac = nacimientos_por_dni[paciente_dni]
         fecha_min = max(fecha_inag, fecha_nac,
                         hoy - timedelta(days=365 * VENTANA_VISITAS_ANIOS))
-        fecha = _fecha_aleatoria_dentro_ventana(fecha_min, rng)
-        fecha = _dia_siguiente(horario["dia"], fecha)
-        if fecha < fecha_inag or fecha < fecha_nac:
-            fecha = _dia_siguiente(horario["dia"], max(fecha_inag, fecha_nac))
-        return fecha
+        dia_semana = DIAS_SEMANA.index(horario["dia"])
+        return _fecha_aleatoria_dentro_ventana(fecha_min, dia_semana, rng)
 
     # 1. Primero los registros de internaciones actuales (fechas recientes).
     #    Van en servicios que internan (tipo con interna=true) y con pacientes

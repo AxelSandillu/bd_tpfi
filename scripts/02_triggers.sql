@@ -59,6 +59,7 @@ BEGIN
       IF NEW.nacimiento IS NULL OR AGE(CURRENT_DATE, NEW.nacimiento) < INTERVAL '18 years' THEN
             RAISE EXCEPTION 'La persona debe ser mayor de 18 años (nacimiento: %)', COALESCE(NEW.nacimiento::TEXT, 'NULL');
       END IF;
+      RETURN NEW;
 END;
 $$;
 

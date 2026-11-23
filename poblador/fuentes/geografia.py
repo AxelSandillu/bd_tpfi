@@ -1,12 +1,11 @@
-"""Fuentes geográficas: Georef AR y Overpass API.
+"""Fuentes geográficas: API Georef v2 y Overpass API.
 
-Obtiene departamentos, localidades y calles de Entre Ríos (Georef) y barrios
-(Overpass). Todo se cachea en disco y, si la API falla o devuelve muy pocos
-resultados, se usa una lista curada en data/geografia_fallback.json para que
-el programa funcione completamente offline.
+Los resultados se guardan en cache. En modo offline se utilizan los archivos
+cacheados y, si faltan, el conjunto curado incluido en data/geografia_fallback.json.
 """
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -26,17 +25,17 @@ from config import (
 
 CACHE_DIR = Path("cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
 FALLBACK_PATH = Path("data") / "geografia_fallback.json"
+OFFLINE_ENV = "POBLADOR_OFFLINE"
 
 
 class GeografiaError(Exception):
     """Error al obtener datos geográficos."""
 
 
-# ---------------------------------------------------------------------------
-# Cache en disco
-# ---------------------------------------------------------------------------
+def _offline() -> bool:
+    return os.environ.get(OFFLINE_ENV) == "1"
+
 
 def _cache_path(nombre: str) -> Path:
     return CACHE_DIR / f"geografia_{nombre}.json"
@@ -46,99 +45,138 @@ def _cargar_cache(nombre: str):
     cache_file = _cache_path(nombre)
     if not cache_file.exists():
         return None
-    with open(cache_file, encoding="utf-8") as f:
-        return json.load(f)
+    with cache_file.open(encoding="utf-8") as archivo:
+        return json.load(archivo)
 
 
 def _guardar_cache(nombre: str, datos) -> None:
-    cache_file = _cache_path(nombre)
-    with open(cache_file, "w", encoding="utf-8") as f:
-        json.dump(datos, f, ensure_ascii=False, indent=2)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    with _cache_path(nombre).open("w", encoding="utf-8") as archivo:
+        json.dump(datos, archivo, ensure_ascii=False, indent=2)
 
 
-# ---------------------------------------------------------------------------
-# HTTP con reintentos
-# ---------------------------------------------------------------------------
+def _es_error_cliente(exc: requests.RequestException) -> bool:
+    """Los 4xx (salvo 429) no se solucionan repitiendo la misma petición."""
+    response = getattr(exc, "response", None)
+    status = getattr(response, "status_code", None)
+    return status is not None and 400 <= status < 500 and status != 429
+
 
 def _fetch_json(url: str, params=None, timeout: int = 30):
-    """Hace una petición GET con reintentos. Lanza GeografiaError si falla."""
+    """GET con reintentos acotados; falla rápido ante errores HTTP 4xx."""
     ultimo_error = None
     for intento in range(1, MAX_REINTENTOS + 1):
         try:
-            resp = requests.get(url, params=params, timeout=timeout)
-            resp.raise_for_status()
-            return resp.json()
-        except (requests.RequestException, ValueError) as exc:
+            respuesta = requests.get(url, params=params, timeout=timeout)
+            respuesta.raise_for_status()
+            return respuesta.json()
+        except requests.RequestException as exc:
             ultimo_error = exc
-            if intento < MAX_REINTENTOS:
-                time.sleep(0.5 * intento)
-    raise GeografiaError(
-        f"No se pudo consultar {url} tras {MAX_REINTENTOS} intentos: {ultimo_error}"
-    )
+            if _es_error_cliente(exc) or intento == MAX_REINTENTOS:
+                break
+        except ValueError as exc:
+            ultimo_error = exc
+            if intento == MAX_REINTENTOS:
+                break
+        time.sleep(0.5 * intento)
+    raise GeografiaError(f"No se pudo consultar {url}: {ultimo_error}") from ultimo_error
 
 
 def _fetch_overpass(timeout: int = 60):
-    """Consulta la API de Overpass con reintentos."""
+    """POST a Overpass con reintentos y corte ante errores HTTP 4xx."""
     ultimo_error = None
     for intento in range(1, MAX_REINTENTOS + 1):
         try:
-            resp = requests.post(URL_OVERPASS, data=OVERPASS_QUERY_BARRIOS, timeout=timeout)
-            resp.raise_for_status()
-            return resp.json()
-        except (requests.RequestException, ValueError) as exc:
+            respuesta = requests.post(
+                URL_OVERPASS, data=OVERPASS_QUERY_BARRIOS, timeout=timeout
+            )
+            respuesta.raise_for_status()
+            return respuesta.json()
+        except requests.RequestException as exc:
             ultimo_error = exc
-            if intento < MAX_REINTENTOS:
-                time.sleep(0.5 * intento)
-    raise GeografiaError(
-        f"No se pudo consultar Overpass tras {MAX_REINTENTOS} intentos: {ultimo_error}"
-    )
+            if _es_error_cliente(exc) or intento == MAX_REINTENTOS:
+                break
+        except ValueError as exc:
+            ultimo_error = exc
+            if intento == MAX_REINTENTOS:
+                break
+        time.sleep(0.5 * intento)
+    raise GeografiaError(f"No se pudo consultar Overpass: {ultimo_error}") from ultimo_error
 
-
-# ---------------------------------------------------------------------------
-# Fallback curado
-# ---------------------------------------------------------------------------
 
 def _cargar_fallback():
-    with open(FALLBACK_PATH, encoding="utf-8") as f:
-        return json.load(f)
+    if not FALLBACK_PATH.is_file():
+        raise GeografiaError(
+            f"No existe el fallback geográfico: {FALLBACK_PATH.resolve()}"
+        )
+    with FALLBACK_PATH.open(encoding="utf-8") as archivo:
+        return json.load(archivo)
 
 
-# ---------------------------------------------------------------------------
-# Georef
-# ---------------------------------------------------------------------------
+def _lista_respuesta(datos: dict, clave: str) -> list[dict]:
+    """Extrae la colección de Georef y tolera el envoltorio resultados si aparece."""
+    coleccion = datos.get(clave)
+    if coleccion is None and isinstance(datos.get("resultados"), dict):
+        coleccion = datos["resultados"].get(clave)
+    return coleccion if isinstance(coleccion, list) else []
+
+
+def _id_relacionado(registro: dict, relacion: str):
+    """Obtiene el ID de una relación tanto anidada como aplanada por la API."""
+    valor = registro.get(relacion)
+    if isinstance(valor, dict):
+        return valor.get("id")
+    return registro.get(f"{relacion}_id", valor)
+
+
+def _usar_fallback_departamentos():
+    resultado = _cargar_fallback()["departamentos"]
+    _guardar_cache("departamentos", resultado)
+    return resultado
+
 
 def obtener_departamentos():
-    """Devuelve la lista de departamentos de Entre Ríos (id, nombre)."""
+    """Devuelve departamentos de Entre Ríos en formato id/nombre."""
     cache = _cargar_cache("departamentos")
     if cache is not None:
         return cache
+    if _offline():
+        return _usar_fallback_departamentos()
 
     try:
         datos = _fetch_json(
             f"{URL_GEOREF}{GEOREF_ENDPOINT_DEPARTAMENTOS}",
             params={"provincia": PROVINCIA_ENTRE_RIOS, "campos": "id,nombre", "max": 100},
         )
-        departamentos = datos.get("departamentos", [])
+        departamentos = _lista_respuesta(datos, "departamentos")
         if len(departamentos) < GEOREF_MIN_RESULTADOS:
             raise GeografiaError(
-                f"Georef devolvió pocos departamentos ({len(departamentos)}), "
+                f"Georef devolvió {len(departamentos)} departamentos; "
                 f"se esperaban al menos {GEOREF_MIN_RESULTADOS}"
             )
-        resultado = [{"id": d["id"], "nombre": d["nombre"]} for d in departamentos]
+        resultado = [
+            {"id": d["id"], "nombre": d["nombre"]} for d in departamentos
+        ]
         _guardar_cache("departamentos", resultado)
         return resultado
-    except GeografiaError:
-        fallback = _cargar_fallback()["departamentos"]
-        _guardar_cache("departamentos", fallback)
-        return fallback
+    except (GeografiaError, KeyError, TypeError):
+        return _usar_fallback_departamentos()
 
 
 def obtener_localidades(id_departamento: int):
-    """Devuelve las localidades de un departamento (id, nombre, id_departamento)."""
+    """Devuelve localidades de un departamento con su FK geográfica."""
     cache_key = f"localidades_{id_departamento}"
     cache = _cargar_cache(cache_key)
     if cache is not None:
         return cache
+
+    fallback = [
+        loc for loc in _cargar_fallback()["localidades"]
+        if str(loc["id_departamento"]) == str(id_departamento)
+    ]
+    if _offline():
+        _guardar_cache(cache_key, fallback)
+        return fallback
 
     try:
         datos = _fetch_json(
@@ -149,38 +187,42 @@ def obtener_localidades(id_departamento: int):
                 "max": 200,
             },
         )
-        localidades = datos.get("localidades", [])
+        localidades = _lista_respuesta(datos, "localidades")
         if len(localidades) < GEOREF_MIN_RESULTADOS:
             raise GeografiaError(
-                f"Georef devolvió pocas localidades ({len(localidades)}) para "
-                f"el departamento {id_departamento}"
+                f"Georef devolvió {len(localidades)} localidades para el "
+                f"departamento {id_departamento}"
             )
         resultado = [
             {
                 "id": loc["id"],
                 "nombre": loc["nombre"],
-                "id_departamento": loc["departamento"]["id"],
+                "id_departamento": _id_relacionado(loc, "departamento") or id_departamento,
             }
             for loc in localidades
         ]
         _guardar_cache(cache_key, resultado)
         return resultado
-    except GeografiaError:
-        fallback = [
-            loc
-            for loc in _cargar_fallback()["localidades"]
-            if loc["id_departamento"] == id_departamento
-        ]
+    except (GeografiaError, KeyError, TypeError):
         _guardar_cache(cache_key, fallback)
         return fallback
 
 
 def obtener_calles(id_departamento: int, id_localidad: int | None = None):
-    """Devuelve las calles de un departamento (y opcionalmente de una localidad)."""
+    """Devuelve calles de un departamento y, opcionalmente, de una localidad."""
     cache_key = f"calles_{id_departamento}_{id_localidad or 'todos'}"
     cache = _cargar_cache(cache_key)
     if cache is not None:
         return cache
+
+    fallback = [
+        calle for calle in _cargar_fallback()["calles"]
+        if str(calle["id_departamento"]) == str(id_departamento)
+        and (id_localidad is None or str(calle.get("id_localidad")) == str(id_localidad))
+    ]
+    if _offline():
+        _guardar_cache(cache_key, fallback)
+        return fallback
 
     params = {
         "departamento": id_departamento,
@@ -192,68 +234,61 @@ def obtener_calles(id_departamento: int, id_localidad: int | None = None):
 
     try:
         datos = _fetch_json(f"{URL_GEOREF}{GEOREF_ENDPOINT_CALLES}", params=params)
-        calles = datos.get("calles", [])
+        calles = _lista_respuesta(datos, "calles")
         if len(calles) < GEOREF_MIN_RESULTADOS:
             raise GeografiaError(
-                f"Georef devolvió pocas calles ({len(calles)}) para el "
-                f"departamento {id_departamento}"
+                f"Georef devolvió {len(calles)} calles para el departamento "
+                f"{id_departamento}"
             )
         resultado = [
             {
-                "id": c["id"],
-                "nombre": c["nombre"],
-                "id_departamento": c["departamento"]["id"],
-                "id_localidad": c.get("localidad", {}).get("id"),
+                "id": calle["id"],
+                "nombre": calle["nombre"],
+                "id_departamento": _id_relacionado(calle, "departamento") or id_departamento,
+                "id_localidad": _id_relacionado(calle, "localidad"),
             }
-            for c in calles
+            for calle in calles
         ]
         _guardar_cache(cache_key, resultado)
         return resultado
-    except GeografiaError:
-        fallback = [
-            c
-            for c in _cargar_fallback()["calles"]
-            if c["id_departamento"] == id_departamento
-            and (id_localidad is None or c.get("id_localidad") == id_localidad)
-        ]
+    except (GeografiaError, KeyError, TypeError):
         _guardar_cache(cache_key, fallback)
         return fallback
 
 
-# ---------------------------------------------------------------------------
-# Overpass (barrios)
-# ---------------------------------------------------------------------------
-
 def obtener_barrios():
-    """Devuelve barrios (place=suburb|neighbourhood|quarter) de Entre Ríos."""
+    """Devuelve barrios de Entre Ríos; offline usa el fallback local."""
     cache = _cargar_cache("barrios")
     if cache is not None:
         return cache
+    if _offline():
+        resultado = _cargar_fallback()["barrios"]
+        _guardar_cache("barrios", resultado)
+        return resultado
 
     try:
         datos = _fetch_overpass()
-        elementos = datos.get("elements", [])
         barrios = []
-        for el in elementos:
-            tags = el.get("tags", {})
+        for elemento in datos.get("elements", []):
+            tags = elemento.get("tags", {})
             nombre = tags.get("name")
             if not nombre:
                 continue
-            lat = el.get("lat")
-            lon = el.get("lon")
+            lat = elemento.get("lat")
+            lon = elemento.get("lon")
             if lat is None or lon is None:
-                centro = el.get("center", {})
-                lat = centro.get("lat")
-                lon = centro.get("lon")
-            barrios.append({"nombre": nombre, "lat": lat, "lon": lon})
+                centro = elemento.get("center", {})
+                lat, lon = centro.get("lat"), centro.get("lon")
+            if lat is not None and lon is not None:
+                barrios.append({"nombre": nombre, "lat": lat, "lon": lon})
         if len(barrios) < GEOREF_MIN_RESULTADOS:
             raise GeografiaError(
-                f"Overpass devolvió pocos barrios ({len(barrios)}), se esperaban "
-                f"al menos {GEOREF_MIN_RESULTADOS}"
+                f"Overpass devolvió {len(barrios)} barrios; se esperaban al menos "
+                f"{GEOREF_MIN_RESULTADOS}"
             )
         _guardar_cache("barrios", barrios)
         return barrios
-    except GeografiaError:
-        fallback = _cargar_fallback()["barrios"]
-        _guardar_cache("barrios", fallback)
-        return fallback
+    except (GeografiaError, KeyError, TypeError):
+        resultado = _cargar_fallback()["barrios"]
+        _guardar_cache("barrios", resultado)
+        return resultado

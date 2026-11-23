@@ -120,6 +120,21 @@ def test_fecha_reciente_es_anterior_a_hoy():
     assert fecha >= date.today() - timedelta(days=20)
 
 
+def test_fecha_aleatoria_con_dia_semana_no_supera_ayer():
+    import random
+    from generadores.registro_hc import _fecha_aleatoria_dentro_ventana
+
+    hoy = date.today()
+    fecha_minima = hoy - timedelta(days=60)
+    for dia_semana in range(7):
+        fecha = _fecha_aleatoria_dentro_ventana(
+            fecha_minima, dia_semana, random.Random(42 + dia_semana)
+        )
+        assert fecha < hoy
+        assert fecha.weekday() == dia_semana
+        assert fecha >= fecha_minima
+
+
 # ---------------------------------------------------------------------------
 # Test: generar_registro_hc completo
 # ---------------------------------------------------------------------------

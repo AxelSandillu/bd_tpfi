@@ -9,6 +9,8 @@ direccion y demas campos.
 """
 
 import json
+import hashlib
+import os
 import time
 from pathlib import Path
 
@@ -36,7 +38,8 @@ def _cache_path(nat: str, seed: int) -> Path:
 
 def _api_seed(seed: int, nat: str) -> int:
     """Deriva una semilla para la API a partir de config.SEED y la nacionalidad."""
-    return abs(hash((seed, nat))) % (2**31 - 1)
+    digest = hashlib.sha256(f"{seed}:{nat}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], "big") % (2**31 - 1)
 
 
 def _fetch_one(nat: str, cantidad: int, seed: int, timeout: int = 30) -> list[dict]:
@@ -53,11 +56,26 @@ def _fetch_one(nat: str, cantidad: int, seed: int, timeout: int = 30) -> list[di
             resp = requests.get(URL_RANDOMUSER, params=params, timeout=timeout)
             resp.raise_for_status()
             data = resp.json()
-            return data["results"]
-        except (requests.RequestException, ValueError, KeyError) as exc:
+            resultados = data["results"]
+            if not resultados:
+                raise RandomUserError(
+                    f"randomuser.me devolvió una lista vacía para nat={nat}"
+                )
+            return resultados
+        except requests.RequestException as exc:
             ultimo_error = exc
-            if intento < MAX_REINTENTOS:
-                time.sleep(0.5 * intento)
+            respuesta = getattr(exc, "response", None)
+            status = getattr(respuesta, "status_code", None)
+            # Un 4xx (excepto 429) indica una petición inválida: reintentar
+            # exactamente lo mismo no va a corregirla.
+            if (status is not None and 400 <= status < 500 and status != 429) or intento == MAX_REINTENTOS:
+                break
+        except (ValueError, KeyError) as exc:
+            ultimo_error = exc
+            if intento == MAX_REINTENTOS:
+                break
+        if intento < MAX_REINTENTOS:
+            time.sleep(0.5 * intento)
     raise RandomUserError(
         f"No se pudo obtener datos de randomuser.me para nat={nat} tras "
         f"{MAX_REINTENTOS} intentos: {ultimo_error}"
@@ -109,14 +127,22 @@ def obtener_personas(cantidad_total: int) -> list[dict]:
     config.MARGEN_API). Descarga y guarda en cache la primera ejecucion. Las
     siguientes, incluso sin red, devuelven exactamente las mismas personas.
     """
-    verificar_nats_disponibles()
+    offline = os.environ.get("POBLADOR_OFFLINE") == "1"
 
+    # No hacemos una llamada de verificación por nacionalidad: cada consulta
+    # adicional aumenta el tiempo de ejecución y no aporta datos al generador.
+    # La caché existente se reutiliza tanto online como offline.
     personas: list[dict] = []
     for nat, peso in PESOS_NAT.items():
         cantidad = max(1, int(cantidad_total * peso * MARGEN_API))
 
         resultados = _cargar_cache(nat, SEED)
         if resultados is None:
+            if offline:
+                raise RandomUserError(
+                    f"Modo offline: falta cache/{_cache_path(nat, SEED).name}. "
+                    "Ejecute primero una corrida online con la misma semilla."
+                )
             resultados = _fetch_one(nat, cantidad, SEED)
             _guardar_cache(nat, SEED, resultados)
 
