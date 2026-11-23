@@ -31,8 +31,6 @@ from typing import NamedTuple
 class TiposServicioInvalido(Exception):
     """El archivo tipos_servicio.json no cumple las reglas de arranque."""
 
-    pass
-
 
 def cargar_tipos_servicio(ruta: str) -> dict:
     """Lee y valida data/tipos_servicio.json al arrancar.
@@ -49,9 +47,7 @@ def cargar_tipos_servicio(ruta: str) -> dict:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise TiposServicioInvalido(
-            f"JSON mal formado en {ruta}: {exc}"
-        ) from exc
+        raise TiposServicioInvalido(f"JSON mal formado en {ruta}: {exc}") from exc
 
     if not isinstance(data, dict):
         raise TiposServicioInvalido(
@@ -215,7 +211,11 @@ def cargar_tipos_servicio(ruta: str) -> dict:
                     )
 
         peso = tipo.get("peso")
-        if peso is not None and not isinstance(peso, (int, float)) or isinstance(peso, bool):
+        if (
+            peso is not None
+            and not isinstance(peso, (int, float))
+            or isinstance(peso, bool)
+        ):
             raise TiposServicioInvalido(
                 f"tipos_servicio.json: tipos_servicio[{i}] ('{nombre}') campo "
                 f"'peso' debe ser numérico"
@@ -253,6 +253,7 @@ def cargar_tipos_servicio(ruta: str) -> dict:
 # Validador de las tablas generadas (issue #16)
 # ===========================================================================
 
+
 class Violacion(NamedTuple):
     """Una regla incumplida.
 
@@ -278,7 +279,9 @@ MAX_VARCHAR = 30  # largo de los VARCHAR(30) del esquema
 # Se usan con fullmatch, por eso no llevan ^ ni $.
 REGEX_MATRICULA = re.compile(r"[0-9]{2}[1-5][0-9]+")  # DOMAIN Matricula
 REGEX_TELEFONO = re.compile(r"\+?[0-9\s\-\(\)]{7,15}")  # trigger de personal
-REGEX_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", re.IGNORECASE)
+REGEX_EMAIL = re.compile(
+    r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", re.IGNORECASE
+)
 MIN_DIGITOS_TELEFONO = 7
 EDAD_MINIMA_PERSONAL = 18
 
@@ -360,6 +363,7 @@ FECHAS_ANTERIORES_A_HOY = (
 
 # --- Utilidades --------------------------------------------------------------
 
+
 def _filas(tablas: dict, nombre: str) -> list[dict]:
     return tablas.get(nombre) or []
 
@@ -372,9 +376,7 @@ def _instante(valor) -> datetime | None:
         return datetime.combine(valor, time.min)
     if isinstance(valor, str):
         try:
-            return datetime.fromisoformat(valor.strip().replace("Z", "+00:00")).replace(
-                tzinfo=None
-            )
+            return datetime.fromisoformat(valor.strip()).replace(tzinfo=None)
         except ValueError:
             return None
     return None
@@ -394,7 +396,10 @@ def _hora(valor) -> time | None:
 def _ids_registro_hc(tablas: dict) -> dict:
     """{id del registro: fila}. Si la fila no trae `id`, vale su posición (1-based),
     que es el id que le toca al emitir el SQL con ids explícitos."""
-    return {r.get("id", pos): r for pos, r in enumerate(_filas(tablas, "registro_hc"), start=1)}
+    return {
+        r.get("id", pos): r
+        for pos, r in enumerate(_filas(tablas, "registro_hc"), start=1)
+    }
 
 
 def _valores_referenciables(tablas: dict, tabla: str, columna: str) -> set:
@@ -404,10 +409,15 @@ def _valores_referenciables(tablas: dict, tabla: str, columna: str) -> set:
 
 
 def _edad(nacimiento: date, hoy: date) -> int:
-    return hoy.year - nacimiento.year - ((hoy.month, hoy.day) < (nacimiento.month, nacimiento.day))
+    return (
+        hoy.year
+        - nacimiento.year
+        - ((hoy.month, hoy.day) < (nacimiento.month, nacimiento.day))
+    )
 
 
 # --- Reglas por grupo ----------------------------------------------------------
+
 
 def _unicidad(tablas: dict) -> list[Violacion]:
     out = []
@@ -420,11 +430,15 @@ def _unicidad(tablas: dict) -> list[Violacion]:
                 if any(v is None for v in valor):
                     continue
                 if valor in vistos:
-                    out.append(Violacion(
-                        tabla, i, "unique",
-                        f"{'+'.join(columnas)} = {valor if len(valor) > 1 else valor[0]!r} "
-                        f"repetido (ya está en la fila {vistos[valor]})",
-                    ))
+                    out.append(
+                        Violacion(
+                            tabla,
+                            i,
+                            "unique",
+                            f"{'+'.join(columnas)} = {valor if len(valor) > 1 else valor[0]!r} "
+                            f"repetido (ya está en la fila {vistos[valor]})",
+                        )
+                    )
                 else:
                     vistos[valor] = i
     return out
@@ -437,30 +451,52 @@ def _largos(tablas: dict) -> list[Violacion]:
             for c in columnas:
                 valor = f.get(c)
                 if isinstance(valor, str) and len(valor) > MAX_VARCHAR:
-                    out.append(Violacion(
-                        tabla, i, "largo_maximo",
-                        f"{c} = {valor!r} tiene {len(valor)} caracteres (máximo {MAX_VARCHAR})",
-                    ))
+                    out.append(
+                        Violacion(
+                            tabla,
+                            i,
+                            "largo_maximo",
+                            f"{c} = {valor!r} tiene {len(valor)} caracteres (máximo {MAX_VARCHAR})",
+                        )
+                    )
     return out
 
 
 def _formatos_personal(tablas: dict) -> list[Violacion]:
     out = []
     for i, p in enumerate(_filas(tablas, "personal")):
-        matricula, telefono, email = p.get("matricula"), p.get("telefono"), p.get("email")
+        matricula, telefono, email = (
+            p.get("matricula"),
+            p.get("telefono"),
+            p.get("email"),
+        )
         if not isinstance(matricula, str) or not REGEX_MATRICULA.fullmatch(matricula):
-            out.append(Violacion("personal", i, "regex_matricula",
-                                 f"matricula = {matricula!r} no cumple [0-9]{{2}}[1-5][0-9]+"))
+            out.append(
+                Violacion(
+                    "personal",
+                    i,
+                    "regex_matricula",
+                    f"matricula = {matricula!r} no cumple [0-9]{{2}}[1-5][0-9]+",
+                )
+            )
         if (
             not isinstance(telefono, str)
             or not REGEX_TELEFONO.fullmatch(telefono)
             or len(re.sub(r"[^0-9]", "", telefono)) < MIN_DIGITOS_TELEFONO
         ):
-            out.append(Violacion("personal", i, "regex_telefono",
-                                 f"telefono = {telefono!r} inválido (formato o menos de "
-                                 f"{MIN_DIGITOS_TELEFONO} dígitos)"))
+            out.append(
+                Violacion(
+                    "personal",
+                    i,
+                    "regex_telefono",
+                    f"telefono = {telefono!r} inválido (formato o menos de "
+                    f"{MIN_DIGITOS_TELEFONO} dígitos)",
+                )
+            )
         if not isinstance(email, str) or not REGEX_EMAIL.fullmatch(email):
-            out.append(Violacion("personal", i, "regex_email", f"email = {email!r} inválido"))
+            out.append(
+                Violacion("personal", i, "regex_email", f"email = {email!r} inválido")
+            )
     return out
 
 
@@ -468,12 +504,24 @@ def _enums(tablas: dict) -> list[Violacion]:
     out = []
     for i, p in enumerate(_filas(tablas, "personal")):
         if p.get("rol") not in ROLES:
-            out.append(Violacion("personal", i, "enum_invalido",
-                                 f"rol = {p.get('rol')!r} (debe ser uno de {ROLES})"))
+            out.append(
+                Violacion(
+                    "personal",
+                    i,
+                    "enum_invalido",
+                    f"rol = {p.get('rol')!r} (debe ser uno de {ROLES})",
+                )
+            )
     for i, h in enumerate(_filas(tablas, "horario_atencion")):
         if h.get("dia") not in DIAS:
-            out.append(Violacion("horario_atencion", i, "enum_invalido",
-                                 f"dia = {h.get('dia')!r} (debe ser uno de {DIAS})"))
+            out.append(
+                Violacion(
+                    "horario_atencion",
+                    i,
+                    "enum_invalido",
+                    f"dia = {h.get('dia')!r} (debe ser uno de {DIAS})",
+                )
+            )
     return out
 
 
@@ -486,10 +534,14 @@ def _claves_foraneas(tablas: dict) -> list[Violacion]:
             if valor is None:  # FK nullable
                 continue
             if valor not in validos:
-                out.append(Violacion(
-                    tabla, i, "fk",
-                    f"{columna} = {valor!r} no existe en {ref_tabla}.{ref_columna}",
-                ))
+                out.append(
+                    Violacion(
+                        tabla,
+                        i,
+                        "fk",
+                        f"{columna} = {valor!r} no existe en {ref_tabla}.{ref_columna}",
+                    )
+                )
     return out
 
 
@@ -502,13 +554,23 @@ def _fechas(tablas: dict, hoy: date) -> list[Violacion]:
                 continue
             instante = _instante(valor)
             if instante is None:
-                out.append(Violacion(tabla, i, "fecha_invalida",
-                                     f"{columna} = {valor!r} no es una fecha válida"))
+                out.append(
+                    Violacion(
+                        tabla,
+                        i,
+                        "fecha_invalida",
+                        f"{columna} = {valor!r} no es una fecha válida",
+                    )
+                )
             elif instante.date() >= hoy:
-                out.append(Violacion(
-                    tabla, i, "fecha_anterior_a_hoy",
-                    f"{columna} = {valor!r} debe ser estrictamente anterior a hoy ({hoy})",
-                ))
+                out.append(
+                    Violacion(
+                        tabla,
+                        i,
+                        "fecha_anterior_a_hoy",
+                        f"{columna} = {valor!r} debe ser estrictamente anterior a hoy ({hoy})",
+                    )
+                )
     return out
 
 
@@ -516,11 +578,18 @@ def _edad_personal(tablas: dict, hoy: date) -> list[Violacion]:
     out = []
     for i, p in enumerate(_filas(tablas, "personal")):
         nacimiento = _instante(p.get("nacimiento"))
-        if nacimiento is not None and _edad(nacimiento.date(), hoy) < EDAD_MINIMA_PERSONAL:
-            out.append(Violacion(
-                "personal", i, "personal_mayor_de_18",
-                f"nacimiento = {p.get('nacimiento')!r}: tiene menos de {EDAD_MINIMA_PERSONAL} años",
-            ))
+        if (
+            nacimiento is not None
+            and _edad(nacimiento.date(), hoy) < EDAD_MINIMA_PERSONAL
+        ):
+            out.append(
+                Violacion(
+                    "personal",
+                    i,
+                    "personal_mayor_de_18",
+                    f"nacimiento = {p.get('nacimiento')!r}: tiene menos de {EDAD_MINIMA_PERSONAL} años",
+                )
+            )
     return out
 
 
@@ -530,18 +599,24 @@ def _servicios(tablas: dict) -> list[Violacion]:
     tipos = {t.get("nombre"): t for t in _filas(tablas, "tipo_servicio")}
     miembros: dict = {}  # id_servicio -> [matriculas]
     for ps in _filas(tablas, "personal_servicio"):
-        miembros.setdefault(ps.get("id_servicio"), []).append(ps.get("matricula_personal"))
+        miembros.setdefault(ps.get("id_servicio"), []).append(
+            ps.get("matricula_personal")
+        )
 
     vistos: dict = {}
     for i, s in enumerate(_filas(tablas, "servicio")):
         # (centro, tipo) único
         par = (s.get("id_centro_salud"), s.get("nombre_tipo_servicio"))
         if par in vistos:
-            out.append(Violacion(
-                "servicio", i, "centro_tipo_unico",
-                f"el centro {par[0]!r} ya tiene un servicio de tipo {par[1]!r} "
-                f"(fila {vistos[par]})",
-            ))
+            out.append(
+                Violacion(
+                    "servicio",
+                    i,
+                    "centro_tipo_unico",
+                    f"el centro {par[0]!r} ya tiene un servicio de tipo {par[1]!r} "
+                    f"(fila {vistos[par]})",
+                )
+            )
         else:
             vistos[par] = i
 
@@ -549,15 +624,23 @@ def _servicios(tablas: dict) -> list[Violacion]:
         encargado = s.get("matricula_encargado")
         if encargado is not None and encargado in roles:
             if roles[encargado] != "Médico":
-                out.append(Violacion(
-                    "servicio", i, "encargado_medico",
-                    f"matricula_encargado = {encargado!r} es {roles[encargado]!r}, no Médico",
-                ))
+                out.append(
+                    Violacion(
+                        "servicio",
+                        i,
+                        "encargado_medico",
+                        f"matricula_encargado = {encargado!r} es {roles[encargado]!r}, no Médico",
+                    )
+                )
             elif encargado not in miembros.get(s.get("id"), []):
-                out.append(Violacion(
-                    "servicio", i, "encargado_en_servicio",
-                    f"matricula_encargado = {encargado!r} no trabaja en el servicio {s.get('id')!r}",
-                ))
+                out.append(
+                    Violacion(
+                        "servicio",
+                        i,
+                        "encargado_en_servicio",
+                        f"matricula_encargado = {encargado!r} no trabaja en el servicio {s.get('id')!r}",
+                    )
+                )
 
         # cupos por rol
         tipo = tipos.get(s.get("nombre_tipo_servicio"))
@@ -568,29 +651,43 @@ def _servicios(tablas: dict) -> list[Violacion]:
             if roles.get(m) in cantidad:
                 cantidad[roles[m]] += 1
         if cantidad["Médico"] > tipo.get("num_medicos", cantidad["Médico"]):
-            out.append(Violacion(
-                "servicio", i, "cupo_medicos",
-                f"servicio {s.get('id')!r} ({tipo['nombre']}) tiene {cantidad['Médico']} "
-                f"médicos y el tope es {tipo['num_medicos']}",
-            ))
+            out.append(
+                Violacion(
+                    "servicio",
+                    i,
+                    "cupo_medicos",
+                    f"servicio {s.get('id')!r} ({tipo['nombre']}) tiene {cantidad['Médico']} "
+                    f"médicos y el tope es {tipo['num_medicos']}",
+                )
+            )
         if cantidad["Enfermero"] > tipo.get("num_enfermeros", cantidad["Enfermero"]):
-            out.append(Violacion(
-                "servicio", i, "cupo_enfermeros",
-                f"servicio {s.get('id')!r} ({tipo['nombre']}) tiene {cantidad['Enfermero']} "
-                f"enfermeros y el tope es {tipo['num_enfermeros']}",
-            ))
+            out.append(
+                Violacion(
+                    "servicio",
+                    i,
+                    "cupo_enfermeros",
+                    f"servicio {s.get('id')!r} ({tipo['nombre']}) tiene {cantidad['Enfermero']} "
+                    f"enfermeros y el tope es {tipo['num_enfermeros']}",
+                )
+            )
     return out
 
 
 def _personal_servicio(tablas: dict) -> list[Violacion]:
     out = []
-    tipo_de_servicio = {s.get("id"): s.get("nombre_tipo_servicio") for s in _filas(tablas, "servicio")}
+    tipo_de_servicio = {
+        s.get("id"): s.get("nombre_tipo_servicio") for s in _filas(tablas, "servicio")
+    }
     requeridas: dict = {}
     for er in _filas(tablas, "especialidad_requerida"):
-        requeridas.setdefault(er.get("nombre_tipo_servicio"), set()).add(er.get("nombre_especialidad"))
+        requeridas.setdefault(er.get("nombre_tipo_servicio"), set()).add(
+            er.get("nombre_especialidad")
+        )
     especialidades: dict = {}
     for ee in _filas(tablas, "especializado_en"):
-        especialidades.setdefault(ee.get("matricula_personal"), set()).add(ee.get("nombre_especialidad"))
+        especialidades.setdefault(ee.get("matricula_personal"), set()).add(
+            ee.get("nombre_especialidad")
+        )
 
     vistos: dict = {}
     for i, ps in enumerate(_filas(tablas, "personal_servicio")):
@@ -598,31 +695,43 @@ def _personal_servicio(tablas: dict) -> list[Violacion]:
 
         # una persona, un solo servicio
         if matricula in vistos:
-            out.append(Violacion(
-                "personal_servicio", i, "un_servicio_por_persona",
-                f"matricula_personal = {matricula!r} ya está en el servicio "
-                f"{vistos[matricula][1]!r} (fila {vistos[matricula][0]})",
-            ))
+            out.append(
+                Violacion(
+                    "personal_servicio",
+                    i,
+                    "un_servicio_por_persona",
+                    f"matricula_personal = {matricula!r} ya está en el servicio "
+                    f"{vistos[matricula][1]!r} (fila {vistos[matricula][0]})",
+                )
+            )
         else:
             vistos[matricula] = (i, ps.get("id_servicio"))
 
         # especialidades requeridas por el tipo del servicio (médicos y enfermeros)
         tipo = tipo_de_servicio.get(ps.get("id_servicio"))
-        faltantes = sorted(requeridas.get(tipo, set()) - especialidades.get(matricula, set()))
+        faltantes = sorted(
+            requeridas.get(tipo, set()) - especialidades.get(matricula, set())
+        )
         if faltantes:
-            out.append(Violacion(
-                "personal_servicio", i, "especialidades_requeridas",
-                f"{matricula!r} en el servicio {ps.get('id_servicio')!r} ({tipo}) "
-                f"no tiene: {', '.join(faltantes)}",
-            ))
+            out.append(
+                Violacion(
+                    "personal_servicio",
+                    i,
+                    "especialidades_requeridas",
+                    f"{matricula!r} en el servicio {ps.get('id_servicio')!r} ({tipo}) "
+                    f"no tiene: {', '.join(faltantes)}",
+                )
+            )
     return out
 
 
 def _registros_hc(tablas: dict) -> list[Violacion]:
     out = []
     roles = {p.get("matricula"): p.get("rol") for p in _filas(tablas, "personal")}
-    trabaja_en = {(ps.get("id_servicio"), ps.get("matricula_personal"))
-                  for ps in _filas(tablas, "personal_servicio")}
+    trabaja_en = {
+        (ps.get("id_servicio"), ps.get("matricula_personal"))
+        for ps in _filas(tablas, "personal_servicio")
+    }
     horarios = {h.get("id"): h for h in _filas(tablas, "horario_atencion")}
     servicios = {s.get("id") for s in _filas(tablas, "servicio")}
     horarios_de_servicio: dict = {}
@@ -637,91 +746,141 @@ def _registros_hc(tablas: dict) -> list[Violacion]:
         # lo atiende un médico que trabaja en ese servicio
         if matricula in roles and id_servicio in servicios:
             if roles[matricula] != "Médico":
-                out.append(Violacion(
-                    "registro_hc", i, "registro_medico_del_servicio",
-                    f"matricula_personal = {matricula!r} es {roles[matricula]!r}, no Médico",
-                ))
+                out.append(
+                    Violacion(
+                        "registro_hc",
+                        i,
+                        "registro_medico_del_servicio",
+                        f"matricula_personal = {matricula!r} es {roles[matricula]!r}, no Médico",
+                    )
+                )
             elif (id_servicio, matricula) not in trabaja_en:
-                out.append(Violacion(
-                    "registro_hc", i, "registro_medico_del_servicio",
-                    f"el médico {matricula!r} no trabaja en el servicio {id_servicio!r}",
-                ))
+                out.append(
+                    Violacion(
+                        "registro_hc",
+                        i,
+                        "registro_medico_del_servicio",
+                        f"el médico {matricula!r} no trabaja en el servicio {id_servicio!r}",
+                    )
+                )
 
         # la visita cae dentro del horario del servicio
         instante = _instante(r.get("dia_visita"))
         if instante is None or id_servicio not in servicios:
             continue  # fecha_invalida / fk ya lo reportan
         dia = DIAS[instante.weekday()]
-        del_dia = [h for h in horarios_de_servicio.get(id_servicio, []) if h.get("dia") == dia]
+        del_dia = [
+            h for h in horarios_de_servicio.get(id_servicio, []) if h.get("dia") == dia
+        ]
         if not del_dia:
-            out.append(Violacion(
-                "registro_hc", i, "visita_en_horario",
-                f"dia_visita = {r.get('dia_visita')!r} es {dia} y el servicio {id_servicio!r} "
-                f"no atiende ese día",
-            ))
+            out.append(
+                Violacion(
+                    "registro_hc",
+                    i,
+                    "visita_en_horario",
+                    f"dia_visita = {r.get('dia_visita')!r} es {dia} y el servicio {id_servicio!r} "
+                    f"no atiende ese día",
+                )
+            )
         elif instante.time() != time.min:  # solo se mira la hora si la visita la trae
-            def _cabe(h):
+            hora_visita = instante.time()
+
+            def _cabe(h, hora=hora_visita):
                 apertura, cierre = _hora(h.get("apertura")), _hora(h.get("cierre"))
-                return apertura is not None and cierre is not None \
-                    and apertura <= instante.time() <= cierre
+                return (
+                    apertura is not None
+                    and cierre is not None
+                    and apertura <= hora <= cierre
+                )
+
             if not any(_cabe(h) for h in del_dia):
-                franjas = ", ".join(f"{h.get('apertura')}-{h.get('cierre')}" for h in del_dia)
-                out.append(Violacion(
-                    "registro_hc", i, "visita_en_horario",
-                    f"dia_visita = {r.get('dia_visita')!r}: {instante.time()} está fuera de "
-                    f"la franja del {dia} ({franjas})",
-                ))
+                franjas = ", ".join(
+                    f"{h.get('apertura')}-{h.get('cierre')}" for h in del_dia
+                )
+                out.append(
+                    Violacion(
+                        "registro_hc",
+                        i,
+                        "visita_en_horario",
+                        f"dia_visita = {r.get('dia_visita')!r}: {instante.time()} está fuera de "
+                        f"la franja del {dia} ({franjas})",
+                    )
+                )
     return out
 
 
 def _internaciones(tablas: dict) -> list[Violacion]:
     out = []
     registros = _ids_registro_hc(tablas)
-    tipo_por_servicio = {s.get("id"): s.get("nombre_tipo_servicio") for s in _filas(tablas, "servicio")}
-    interna_por_tipo = {t.get("nombre"): t["interna"] for t in _filas(tablas, "tipo_servicio")
-                        if "interna" in t}  # campo solo del generador: puede no estar
+    tipo_por_servicio = {
+        s.get("id"): s.get("nombre_tipo_servicio") for s in _filas(tablas, "servicio")
+    }
+    interna_por_tipo = {
+        t.get("nombre"): t["interna"]
+        for t in _filas(tablas, "tipo_servicio")
+        if "interna" in t
+    }  # campo solo del generador: puede no estar
 
     usados: dict = {}
     por_paciente: dict = {}  # dni -> [(ingreso, egreso, fila)]
     for i, n in enumerate(_filas(tablas, "internacion")):
         id_registro = n.get("id_registro_hc")
         registro = registros.get(id_registro)
-        ingreso, egreso = _instante(n.get("fecha_ingreso")), _instante(n.get("fecha_egreso"))
+        ingreso, egreso = (
+            _instante(n.get("fecha_ingreso")),
+            _instante(n.get("fecha_egreso")),
+        )
 
         # ingreso = visita
         if registro is not None:
             visita = _instante(registro.get("dia_visita"))
             if ingreso is not None and visita is not None and ingreso != visita:
-                out.append(Violacion(
-                    "internacion", i, "ingreso_igual_a_visita",
-                    f"fecha_ingreso = {n.get('fecha_ingreso')!r} y la visita del registro "
-                    f"{id_registro!r} es {registro.get('dia_visita')!r}",
-                ))
+                out.append(
+                    Violacion(
+                        "internacion",
+                        i,
+                        "ingreso_igual_a_visita",
+                        f"fecha_ingreso = {n.get('fecha_ingreso')!r} y la visita del registro "
+                        f"{id_registro!r} es {registro.get('dia_visita')!r}",
+                    )
+                )
 
             # solo se interna en servicios que internan
             tipo = tipo_por_servicio.get(registro.get("id_servicio"))
             if tipo in interna_por_tipo and not interna_por_tipo[tipo]:
-                out.append(Violacion(
-                    "internacion", i, "internacion_servicio_interna",
-                    f"el registro {id_registro!r} es del servicio {registro.get('id_servicio')!r} "
-                    f"({tipo}), que no admite internación",
-                ))
+                out.append(
+                    Violacion(
+                        "internacion",
+                        i,
+                        "internacion_servicio_interna",
+                        f"el registro {id_registro!r} es del servicio {registro.get('id_servicio')!r} "
+                        f"({tipo}), que no admite internación",
+                    )
+                )
 
         # egreso >= ingreso
         if ingreso is not None and egreso is not None and egreso < ingreso:
-            out.append(Violacion(
-                "internacion", i, "egreso_posterior_a_ingreso",
-                f"fecha_egreso = {n.get('fecha_egreso')!r} es anterior a fecha_ingreso = "
-                f"{n.get('fecha_ingreso')!r}",
-            ))
+            out.append(
+                Violacion(
+                    "internacion",
+                    i,
+                    "egreso_posterior_a_ingreso",
+                    f"fecha_egreso = {n.get('fecha_egreso')!r} es anterior a fecha_ingreso = "
+                    f"{n.get('fecha_ingreso')!r}",
+                )
+            )
 
         # un registro se interna una sola vez
         if id_registro is not None:
             if id_registro in usados:
-                out.append(Violacion(
-                    "internacion", i, "internacion_registro_unico",
-                    f"el registro {id_registro!r} ya tiene una internación (fila {usados[id_registro]})",
-                ))
+                out.append(
+                    Violacion(
+                        "internacion",
+                        i,
+                        "internacion_registro_unico",
+                        f"el registro {id_registro!r} ya tiene una internación (fila {usados[id_registro]})",
+                    )
+                )
             else:
                 usados[id_registro] = i
 
@@ -736,11 +895,15 @@ def _internaciones(tablas: dict) -> list[Violacion]:
         fin_anterior, fila_anterior = None, None
         for ingreso, egreso, fila in intervalos:
             if fin_anterior is not None and ingreso <= fin_anterior:
-                out.append(Violacion(
-                    "internacion", fila, "internacion_sin_solapamiento",
-                    f"el paciente {dni!r} ingresa el {ingreso.date()} mientras sigue internado "
-                    f"por la internación de la fila {fila_anterior}",
-                ))
+                out.append(
+                    Violacion(
+                        "internacion",
+                        fila,
+                        "internacion_sin_solapamiento",
+                        f"el paciente {dni!r} ingresa el {ingreso.date()} mientras sigue internado "
+                        f"por la internación de la fila {fila_anterior}",
+                    )
+                )
             if fin_anterior is None or egreso > fin_anterior:
                 fin_anterior, fila_anterior = egreso, fila
     return out
@@ -749,13 +912,30 @@ def _internaciones(tablas: dict) -> list[Violacion]:
 # --- Punto de entrada ------------------------------------------------------------
 
 REGLAS = (
-    "unique", "largo_maximo", "regex_matricula", "regex_telefono", "regex_email",
-    "enum_invalido", "fk", "fecha_invalida", "fecha_anterior_a_hoy", "personal_mayor_de_18",
-    "centro_tipo_unico", "encargado_medico", "encargado_en_servicio", "cupo_medicos",
-    "cupo_enfermeros", "un_servicio_por_persona", "especialidades_requeridas",
-    "registro_medico_del_servicio", "visita_en_horario", "ingreso_igual_a_visita",
-    "egreso_posterior_a_ingreso", "internacion_registro_unico",
-    "internacion_servicio_interna", "internacion_sin_solapamiento",
+    "unique",
+    "largo_maximo",
+    "regex_matricula",
+    "regex_telefono",
+    "regex_email",
+    "enum_invalido",
+    "fk",
+    "fecha_invalida",
+    "fecha_anterior_a_hoy",
+    "personal_mayor_de_18",
+    "centro_tipo_unico",
+    "encargado_medico",
+    "encargado_en_servicio",
+    "cupo_medicos",
+    "cupo_enfermeros",
+    "un_servicio_por_persona",
+    "especialidades_requeridas",
+    "registro_medico_del_servicio",
+    "visita_en_horario",
+    "ingreso_igual_a_visita",
+    "egreso_posterior_a_ingreso",
+    "internacion_registro_unico",
+    "internacion_servicio_interna",
+    "internacion_sin_solapamiento",
 )
 
 
