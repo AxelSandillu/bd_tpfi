@@ -75,7 +75,7 @@ BEGIN
       SELECT DISTINCT ON (b.id, cs.id)
             b.nombre AS barrio,
             cs.nombre AS centro,
-            p.nombre || ' ' || p.apellido AS medico,
+            CONCAT(p.nombre, ' ', p.apellido)::varchar AS medico,
             COUNT(DISTINCT rhc.dni_paciente) AS cant_pacientes
       FROM registro_hc rhc
       JOIN personal p ON rhc.matricula_personal = p.matricula
@@ -130,7 +130,7 @@ AS $$
 BEGIN
       RETURN QUERY
       SELECT p.dni,
-            CONCAT(p.nombre, ' ', p.apellido) AS paciente,
+            CONCAT(p.nombre, ' ', p.apellido)::varchar AS paciente,
             COUNT(rhc.id) AS cant_ingresos,
             (
                   SELECT cs.nombre
