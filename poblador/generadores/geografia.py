@@ -8,8 +8,7 @@ Produce, en memoria y con semilla reproducible (config.SEED):
 - barrio: 20, distribuidos entre ciudades y con nombres únicos a nivel
   global (se califica con la ciudad si el nombre se repite).
 - centro_de_salud: 20, uno por barrio. Calle y altura vienen de Georef;
-  direccion = "calle altura" (máx. 30 caracteres). Inauguración estrictamente
-  anterior a hoy.
+  Inauguración estrictamente anterior a hoy.
 
 Todos los IDs son secuenciales (se emiten con OVERRIDING SYSTEM VALUE).
 """
@@ -225,22 +224,12 @@ def generar_centros_de_salud(
             calle_nombre = "Calle Falsa"
             altura = 123
 
-        direccion = f"{calle_nombre} {altura}"
-        if len(direccion) > LIMITE_NOMBRE:
-            max_calle = LIMITE_NOMBRE - len(str(altura)) - 1
-            if max_calle > 0:
-                calle_nombre = calle_nombre[:max_calle]
-                direccion = f"{calle_nombre} {altura}"
-            else:
-                direccion = f"Calle {altura}"[:LIMITE_NOMBRE]
-
         fecha_inag = _fecha_aleatoria(ano_ini, ano_fin, hoy, rng)
 
         resultado.append({
             "id": i,
             "id_barrio": barrio["id"],
             "nombre": nombres[i - 1],
-            "direccion": direccion,
             "inaguracion": fecha_inag.isoformat(),
             "calle": calle_nombre,
             "altura": altura,

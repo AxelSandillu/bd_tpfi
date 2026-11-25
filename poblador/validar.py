@@ -294,7 +294,7 @@ COLUMNAS_VARCHAR = {
     "barrio": ("nombre",),
     "obra_social": ("razon_social",),
     "paciente": ("nombre", "apellido"),
-    "centro_de_salud": ("nombre", "direccion", "calle"),
+    "centro_de_salud": ("nombre", "calle"),
     "tipo_servicio": ("nombre",),
     "personal": ("nombre", "apellido", "telefono", "email"),
     "especialidad": ("nombre",),

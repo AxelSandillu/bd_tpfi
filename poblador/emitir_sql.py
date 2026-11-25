@@ -47,7 +47,7 @@ COLUMNAS_TABLAS: dict[str, tuple[str, ...]] = {
     "barrio": ("id", "id_ciudad", "nombre"),
     "obra_social": ("id", "razon_social", "estado"),
     "paciente": ("dni", "id_obra_social", "nombre", "apellido", "nacimiento", "num_asociado"),
-    "centro_de_salud": ("id", "id_barrio", "nombre", "direccion", "inaguracion", "calle", "altura"),
+    "centro_de_salud": ("id", "id_barrio", "nombre", "inaguracion", "calle", "altura"),
     "personal": ("matricula", "nombre", "apellido", "telefono", "email", "nacimiento", "rol"),
     "especialidad": ("nombre",),
     "especializado_en": ("matricula_personal", "nombre_especialidad"),
