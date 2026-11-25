@@ -47,21 +47,21 @@ BEGIN
       IF NEW.email IS NULL OR NEW.email !~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' THEN
             RAISE EXCEPTION 'Formato de email inválido: %', COALESCE(NEW.email, 'NULL');
       END IF;
-
-      -- 2. Validar teléfono (máximo 15 caracteres según VARCHAR(15) y mínimo 7 dígitos reales)
-      IF NEW.telefono IS NULL 
-            OR NEW.telefono !~ '^\+?[0-9\s\-\(\)]{7,15}$' 
+ 
+      -- 2. Validar teléfono (entre 7 y 15 caracteres tras el "+" opcional y mínimo 7 dígitos reales)
+      IF NEW.telefono IS NULL
+            OR NEW.telefono !~ '^\+?[0-9\s\-\(\)]{7,15}$'
             OR LENGTH(REGEXP_REPLACE(NEW.telefono, '[^0-9]', '', 'g')) < 7 THEN
             RAISE EXCEPTION 'Formato de teléfono inválido: %', COALESCE(NEW.telefono, 'NULL');
       END IF;
-
+ 
       -- 3. Validar mayoría de edad (18 años cumplidos)
       IF NEW.nacimiento IS NULL OR AGE(CURRENT_DATE, NEW.nacimiento) < INTERVAL '18 years' THEN
             RAISE EXCEPTION 'La persona debe ser mayor de 18 años (nacimiento: %)', COALESCE(NEW.nacimiento::TEXT, 'NULL');
       END IF;
+ 
       RETURN NEW;
 END;
-$$;
 
 CREATE TRIGGER trg_personal_validar_datos BEFORE INSERT
 OR
@@ -72,11 +72,11 @@ EXECUTE FUNCTION fnc_personal_validar_datos ();
 -- Descripción: Verifica que el personal a cargo sea un médico.
 CREATE OR REPLACE FUNCTION fnc_servicio_personal_encargado () RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-      IF NOT EXISTS (
+      IF NEW.matricula_encargado IS NOT NULL AND NOT EXISTS (
             SELECT 1
             FROM personal
-            WHERE personal.id_personal = NEW.id_personal
-              AND personal.tipo_personal = 'Médico'
+            WHERE personal.matricula = NEW.matricula_encargado
+              AND personal.rol = 'Médico'
       ) THEN
             RAISE EXCEPTION 'El personal encargado debe ser un médico';
       END IF;
@@ -97,7 +97,9 @@ BEGIN
       IF EXISTS (
             SELECT 1
             FROM servicio
-            WHERE servicio.id_centro = NEW.id_centro AND servicio.tipo_servicio = NEW.tipo_servicio AND servicio.id_servicio <> NEW.id_servicio
+            WHERE servicio.id_centro_salud = NEW.id_centro_salud
+              AND servicio.nombre_tipo_servicio = NEW.nombre_tipo_servicio
+              AND servicio.id IS DISTINCT FROM NEW.id
       ) THEN
             RAISE EXCEPTION 'Ya existe un servicio de este tipo en el centro de salud';
       END IF;
@@ -117,13 +119,16 @@ CREATE OR REPLACE FUNCTION fnc_registro_hc_encargado () RETURNS TRIGGER LANGUAGE
 BEGIN
       IF NOT EXISTS (
             SELECT 1
-            FROM personal
-            WHERE personal.id_personal = NEW.id_personal
-              AND personal.tipo_personal = 'Médico'
-              AND personal.id_servicio = NEW.id_servicio
+            FROM personal_servicio ps
+            JOIN personal p ON p.matricula = ps.matricula_personal
+            WHERE ps.id_servicio = NEW.id_servicio
+              AND ps.matricula_personal = NEW.matricula_personal
+              AND p.rol = 'Médico'
       ) THEN
             RAISE EXCEPTION 'El personal encargado debe ser un médico que trabaje en el servicio utilizado';
       END IF;
+
+      RETURN NEW;
 END;
 $$;
 
@@ -136,7 +141,7 @@ EXECUTE FUNCTION fnc_registro_hc_encargado ();
 -- Descripción: La fecha de ingreso debe coincidir con la fecha cargada en el registro.
 CREATE OR REPLACE FUNCTION fnc_internacion_ingreso () RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-      IF NEW.fecha_ingreso <> (SELECT fecha FROM registro_hc WHERE id_registro = NEW.id_registro) THEN
+      IF NEW.fecha_ingreso IS DISTINCT FROM (SELECT dia_visita FROM registro_hc WHERE id = NEW.id_registro_hc) THEN
             RAISE EXCEPTION 'La fecha de ingreso debe coincidir con la fecha del registro';
       END IF;
 

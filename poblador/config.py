@@ -71,7 +71,7 @@ FRANJAS_HORARIAS = [
 # --- Identificadores ---
 SISA_PAIS = 54
 # 1=DNI, 2=LC, 3=LE, 4=CI, 5=PAS. Por defecto solo se usa DNI (peso 1.0).
-SISA_TIPO_DOC_PESOS = {1: 1.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
+SISA_TIPO_DOC_PESOS = {1: 0.75, 2: 0.1, 3: 0.05, 4: 0.05, 5: 0.05}
 EMAIL_DOMINIO = "example.com"
 AREAS_TELEFONICAS = {
     "Paraná": "343",
