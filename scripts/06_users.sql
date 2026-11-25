@@ -21,12 +21,12 @@ GRANT USAGE, SELECT ON SEQUENCE internacion_id_seq TO personal;
 GRANT UPDATE (telefono, email) ON personal TO personal;
 
 -- Permitir uso de funciones a personal
-GRANT EXECUTE ON FUNCTION fn_medico_mas_pacientes_barrio() TO personal;
-GRANT EXECUTE ON FUNCTION fn_centro_mas_servicios() TO personal;
+GRANT EXECUTE ON FUNCTION fnc_medico_mas_pacientes_barrio() TO personal;
+GRANT EXECUTE ON FUNCTION fnc_centro_mas_servicios() TO personal;
 GRANT EXECUTE ON FUNCTION fnc_pacientes_por_diagnostico(TEXT) TO personal;
 GRANT EXECUTE ON FUNCTION fnc_servicios_disponibles(VARCHAR, Dia, TIME) TO personal;
-GRANT EXECUTE ON FUNCTION fn_pacientes_mas_ingresos() TO personal;
-GRANT EXECUTE ON FUNCTION fn_pacientes_internados_pocas_atenciones() TO personal;
+GRANT EXECUTE ON FUNCTION fnc_pacientes_mas_ingresos() TO personal;
+GRANT EXECUTE ON FUNCTION fnc_pacientes_internados_pocas_atenciones() TO personal;
 
 -- Permitir ver tablas maestras a paciente
 GRANT SELECT ON centro_de_salud, servicio, tipo_servicio, obra_social, departamento, ciudad, barrio TO paciente;

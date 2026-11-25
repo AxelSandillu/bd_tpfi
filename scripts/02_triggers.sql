@@ -62,6 +62,7 @@ BEGIN
  
       RETURN NEW;
 END;
+$$;
 
 CREATE TRIGGER trg_personal_validar_datos BEFORE INSERT
 OR
