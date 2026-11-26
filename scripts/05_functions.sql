@@ -40,7 +40,7 @@ AS $$
 BEGIN
       RETURN QUERY
       SELECT cs.nombre,
-            cs.direccion,
+            CONCAT(cs.calle, ' ', cs.altura)::VARCHAR,
             ts.nombre,
             h.apertura,
             h.cierre
@@ -168,7 +168,7 @@ AS $$
 BEGIN
       RETURN QUERY
       SELECT p.dni,
-            CONCAT(p.nombre, ' ', p.apellido) AS paciente,
+            CONCAT(p.nombre, ' ', p.apellido)::VARCHAR AS paciente,
             (
                   SELECT COUNT(r.id)
                   FROM registro_hc r
