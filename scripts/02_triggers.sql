@@ -1,3 +1,6 @@
+-- EJECUTAR .sql COMPLETO PARA CREAR LOS TRIGGERS DE LA BASE DE DATOS
+-- -----------------------------------------------
+
 -- Trigger: Inaguración del centro de salúd.
 -- Descripción: Verifica que la fecha de inauguración sea anterior a hoy
 CREATE OR REPLACE FUNCTION fnc_centro_de_salud_inauguracion () RETURNS TRIGGER LANGUAGE plpgsql AS $$

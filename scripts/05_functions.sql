@@ -1,3 +1,6 @@
+-- EJECUTAR .sql COMPLETO PARA CREAR LAS FUNCIONES DE LA BASE DE DATOS
+-- -----------------------------------------------
+
 -- Función: fnc_pacientes_por_diagnostico
 -- Descripción: Muestra la cantidad de pacientes con el diagnóstico especificado de cada ciudad.
 

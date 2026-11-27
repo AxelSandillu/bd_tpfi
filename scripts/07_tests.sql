@@ -1,3 +1,6 @@
+-- EJECUTAR TEST POR TEST
+-- -----------------------------------------------
+
 -- Tests triggers
 
 -- -----------------------------------------------
@@ -579,7 +582,8 @@ SELECT * FROM fnc_servicios_disponibles('Pediatría General Test', 'Miércoles',
 
 ROLLBACK;
 
--- Test: fnc_servicios_disponibles - Caso 1: Servicio abierto ahora en 2 centros
+-- -----------------------------------------------
+-- fnc_servicios_disponibles - Caso 1: Servicio abierto ahora en 2 centros
 -- Resultado esperado: 2 filas (Centro de Salud Norte y Centro de Salud Sur)
 BEGIN;
 
@@ -592,7 +596,8 @@ SELECT * FROM fnc_servicios_disponibles('Pediatría', 'Lunes', '12:00');
 
 ROLLBACK;
 
--- Test: fnc_servicios_disponibles - Caso 2: El servicio existe en un centro pero fuera de horario
+-- -----------------------------------------------
+-- fnc_servicios_disponibles - Caso 2: El servicio existe en un centro pero fuera de horario
 -- Resultado esperado: 0 filas (el centro no aparece)
 BEGIN;
 
@@ -605,7 +610,8 @@ SELECT * FROM fnc_servicios_disponibles('Pediatría', 'Lunes', '12:00');
 
 ROLLBACK;
 
--- Test: fnc_servicios_disponibles - Caso 3: Servicio que todavía no abrió hoy
+-- -----------------------------------------------
+-- fnc_servicios_disponibles - Caso 3: Servicio que todavía no abrió hoy
 -- Resultado esperado: 0 filas (el centro no aparece)
 BEGIN;
 
@@ -618,7 +624,8 @@ SELECT * FROM fnc_servicios_disponibles('Pediatría', 'Lunes', '12:00');
 
 ROLLBACK;
 
--- Test: fnc_medico_mas_pacientes_barrio - Caso 1: Un médico claramente por encima de los demás en un centro
+-- -----------------------------------------------
+-- fnc_medico_mas_pacientes_barrio - Caso 1: Un médico claramente por encima de los demás en un centro
 -- Resultado esperado: 1 fila con Prueba Diez y 10 pacientes
 BEGIN;
 
@@ -644,7 +651,8 @@ SELECT * FROM fnc_medico_mas_pacientes_barrio() WHERE centro = 'Centro Prueba A1
 
 ROLLBACK;
 
--- Test: fnc_medico_mas_pacientes_barrio - Caso 2: Resultado por cada centro de salud
+-- -----------------------------------------------
+-- fnc_medico_mas_pacientes_barrio - Caso 2: Resultado por cada centro de salud
 -- Resultado esperado: 3 filas, una por centro, con su médico y cantidad
 BEGIN;
 
@@ -676,7 +684,8 @@ SELECT * FROM fnc_medico_mas_pacientes_barrio() WHERE barrio = 'Barrio Prueba A'
 
 ROLLBACK;
 
--- Test: fnc_medico_mas_pacientes_barrio - Caso 3: Los resultados vienen agrupados por barrio
+-- -----------------------------------------------
+-- fnc_medico_mas_pacientes_barrio - Caso 3: Los resultados vienen agrupados por barrio
 -- Resultado esperado: 3 filas, primero los 2 centros del Barrio Prueba A y luego el del Barrio Prueba B
 BEGIN;
 
@@ -708,7 +717,8 @@ SELECT * FROM fnc_medico_mas_pacientes_barrio() WHERE barrio LIKE 'Barrio Prueba
 
 ROLLBACK;
 
--- Test: fnc_centro_mas_servicios - Caso 1: Un barrio con centros de distinta cantidad de servicios
+-- -----------------------------------------------
+-- fnc_centro_mas_servicios - Caso 1: Un barrio con centros de distinta cantidad de servicios
 -- Resultado esperado: 1 fila con Centro Prueba A1 y 5 servicios
 BEGIN;
 
@@ -734,7 +744,8 @@ SELECT * FROM fnc_centro_mas_servicios() WHERE barrio LIKE 'Barrio Prueba%';
 
 ROLLBACK;
 
--- Test: fnc_centro_mas_servicios - Caso 2: Un resultado por barrio
+-- -----------------------------------------------
+-- fnc_centro_mas_servicios - Caso 2: Un resultado por barrio
 -- Resultado esperado: 3 filas, una por barrio, con el centro que más servicios tiene en cada uno
 BEGIN;
 
@@ -766,7 +777,8 @@ SELECT * FROM fnc_centro_mas_servicios() WHERE barrio LIKE 'Barrio Prueba%';
 
 ROLLBACK;
 
--- Test: fnc_centro_mas_servicios - Caso 3: Barrio con un único centro
+-- -----------------------------------------------
+-- fnc_centro_mas_servicios - Caso 3: Barrio con un único centro
 -- Resultado esperado: 1 fila con Centro Prueba A1 y 3 servicios
 BEGIN;
 
@@ -782,7 +794,8 @@ SELECT * FROM fnc_centro_mas_servicios() WHERE barrio = 'Barrio Prueba A';
 
 ROLLBACK;
 
--- Test: fnc_pacientes_mas_ingresos - Caso 1: Hay más de 10 pacientes con ingresos en el último mes
+-- -----------------------------------------------
+-- fnc_pacientes_mas_ingresos - Caso 1: Hay más de 10 pacientes con ingresos en el último mes
 -- Resultado esperado: exactamente 10 filas, ordenadas de mayor a menor cantidad de ingresos
 BEGIN;
 
@@ -830,7 +843,8 @@ SELECT * FROM fnc_pacientes_mas_ingresos();
 
 ROLLBACK;
 
--- Test: fnc_pacientes_mas_ingresos - Caso 2: Hay menos de 10 pacientes con ingresos
+-- -----------------------------------------------
+-- fnc_pacientes_mas_ingresos - Caso 2: Hay menos de 10 pacientes con ingresos
 -- Resultado esperado: 4 filas (los pacientes de prueba), sin error
 BEGIN;
 
@@ -863,7 +877,8 @@ SELECT * FROM fnc_pacientes_mas_ingresos() WHERE dni > 90000000;
 
 ROLLBACK;
 
--- Test: fnc_pacientes_mas_ingresos - Caso 3: Ingresos anteriores al último mes
+-- -----------------------------------------------
+-- fnc_pacientes_mas_ingresos - Caso 3: Ingresos anteriores al último mes
 -- Resultado esperado: 1 fila con Prueba Uno y 4 ingresos (el de hace 40 días no se cuenta)
 BEGIN;
 
@@ -892,7 +907,8 @@ SELECT * FROM fnc_pacientes_mas_ingresos() WHERE dni > 90000000;
 
 ROLLBACK;
 
--- Test: fnc_pacientes_internados_pocas_atenciones - Caso 1: Paciente internado con menos de 5 atenciones
+-- -----------------------------------------------
+-- fnc_pacientes_internados_pocas_atenciones - Caso 1: Paciente internado con menos de 5 atenciones
 -- Resultado esperado: 1 fila con Prueba Uno y 3 atenciones
 BEGIN;
 
@@ -914,7 +930,8 @@ SELECT * FROM fnc_pacientes_internados_pocas_atenciones() WHERE dni = 90000001;
 
 ROLLBACK;
 
--- Test: fnc_pacientes_internados_pocas_atenciones - Caso 2: Paciente con exactamente 5 atenciones
+-- -----------------------------------------------
+-- fnc_pacientes_internados_pocas_atenciones - Caso 2: Paciente con exactamente 5 atenciones
 -- Resultado esperado: 0 filas (el paciente no se cuenta)
 BEGIN;
 
@@ -938,7 +955,8 @@ SELECT * FROM fnc_pacientes_internados_pocas_atenciones() WHERE dni = 90000001;
 
 ROLLBACK;
 
--- Test: fnc_pacientes_internados_pocas_atenciones - Caso 3: Paciente internado sin ninguna atención
+-- -----------------------------------------------
+-- fnc_pacientes_internados_pocas_atenciones - Caso 3: Paciente internado sin ninguna atención
 -- Resultado real de la implementación: 1 fila con 0 atenciones
 BEGIN;
 
@@ -958,7 +976,10 @@ SELECT * FROM fnc_pacientes_internados_pocas_atenciones() WHERE dni = 90000001;
 
 ROLLBACK;
 
--- Test: Usuario administrador - Base: Crear y modificar la estructura de una tabla
+-- Tests usuarios
+
+-- -----------------------------------------------
+-- Usuario administrador - Base: Crear y modificar la estructura de una tabla
 -- Resultado esperado: todas las instrucciones se ejecutan sin error de permisos
 BEGIN;
 SET ROLE administrador;
@@ -982,7 +1003,8 @@ ROLLBACK;
 -- Comprobar que no quedó nada
 SELECT to_regclass('prueba_admin') AS tabla_prueba;
 
--- Test: Usuario personal - Base: Consultar la historia clínica de un paciente y la lista de servicios
+-- -----------------------------------------------
+-- Usuario personal - Base: Consultar la historia clínica de un paciente y la lista de servicios
 -- Resultado esperado: ambas consultas se ejecutan correctamente y devuelven datos
 BEGIN;
 SET ROLE personal;
@@ -995,7 +1017,8 @@ SELECT id, id_centro_salud, nombre_tipo_servicio FROM servicio ORDER BY id;
 
 ROLLBACK;
 
--- Test: Usuario personal - Excepción: Consultar los datos de contacto del resto del personal
+-- -----------------------------------------------
+-- Usuario personal - Excepción: Consultar los datos de contacto del resto del personal
 -- Resultado esperado: la consulta no devuelve los datos del resto del personal (resultado filtrado)
 BEGIN;
 SET ROLE personal;
@@ -1008,7 +1031,9 @@ SELECT count(*) AS cantidad_personal FROM personal;
 
 ROLLBACK;
 
--- Test: Usuario paciente - Base: Consultar los centros de salud disponibles
+-- -----------------------------------------------
+
+-- Usuario paciente - Base: Consultar los centros de salud disponibles
 -- Resultado esperado: la consulta se ejecuta correctamente y devuelve los centros de salud
 BEGIN;
 SET ROLE paciente;
@@ -1017,7 +1042,8 @@ SELECT id, nombre, calle, altura FROM centro_de_salud ORDER BY id;
 
 ROLLBACK;
 
--- Test: Usuario paciente - Excepción: Insertar un registro de atención o modificar una tabla
+-- -----------------------------------------------
+-- Usuario paciente - Excepción: Insertar un registro de atención o modificar una tabla
 -- Resultado esperado: el motor bloquea las tres operaciones con error de falta de privilegios
 
 -- Intento 1: insertar un registro de atención

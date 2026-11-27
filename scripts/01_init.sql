@@ -1,3 +1,6 @@
+-- EJECUTAR .sql COMPLETO PARA CREAR LA BASE DE DATOS
+-- -----------------------------------------------
+
 -- Enum: Día
 CREATE TYPE Dia AS ENUM(
   'Lunes',

@@ -1,4 +1,6 @@
--- Archivo generado automáticamente. No editar manualmente.
+-- EJECUTAR .sql COMPLETO PARA CARGAR LOS DATOS DE LA BASE DE DATOS
+-- -----------------------------------------------
+
 -- La carga completa se ejecuta dentro de una única transacción.
 BEGIN;
 

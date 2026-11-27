@@ -1,3 +1,6 @@
+-- EJECUTAR .sql COMPLETO PARA CREAR LOS USUARIOS DE LA BASE DE DATOS
+-- -----------------------------------------------
+
 -- Crear roles
 CREATE ROLE administrador WITH LOGIN PASSWORD 'admin_2026' SUPERUSER CREATEDB CREATEROLE;
 CREATE ROLE personal WITH LOGIN PASSWORD 'personal_2026' NOSUPERUSER;

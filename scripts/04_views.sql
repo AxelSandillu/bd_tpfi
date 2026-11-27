@@ -1,3 +1,6 @@
+-- EJECUTAR .sql COMPLETO PARA CREAR LAS VISTAS DE LA BASE DE DATOS
+-- -----------------------------------------------
+
 -- Vista: vw_servicios_abiertos
 -- Descripción: Lista con los servicios abiertos en el momento de la consulta, mostrando a qué centro pertenece, su dirección y horario de cierre.
 
