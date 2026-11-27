@@ -20,9 +20,3 @@
 - *Mout, Santiago*  
 - *Sandillú, Axel*
 
----
-
-
-## Generador de datos (issue #19)
-
-La CLI, su configuración, las pruebas y las instrucciones de ejecución están documentadas en [`poblador/README.md`](poblador/README.md).
