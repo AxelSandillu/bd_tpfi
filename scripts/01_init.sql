@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS servicio (
 -- Tabla: Personal servicio
 CREATE TABLE IF NOT EXISTS personal_servicio (
   id_servicio INT NOT NULL,
-  matricula_personal Matricula NOT NULL UNIQUE,
+  matricula_personal Matricula NOT NULL,
   PRIMARY KEY (id_servicio, matricula_personal),
   FOREIGN KEY (id_servicio) REFERENCES servicio,
   FOREIGN KEY (matricula_personal) REFERENCES personal
