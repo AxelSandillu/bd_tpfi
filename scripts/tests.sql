@@ -339,6 +339,7 @@ ROLLBACK;
 
 -- Excepción: fecha ingreso distinta a registro HC
 -- registro_hc id=1 tiene dia_visita='2026-11-17'
+-- Resultado esperado: se lanza una excepción indicando que el inicio de la internación debe ser el mismo día que el que figura en el registro HC.
 BEGIN;
 
 INSERT INTO internacion (id_registro_hc, fecha_ingreso, fecha_egreso) VALUES (1, '2026-11-18', NULL);
@@ -350,6 +351,7 @@ ROLLBACK;
 
 -- Base: actualizar internación sin egreso con fecha posterior
 -- internacion id=107 tiene fecha_ingreso='2026-11-05', fecha_egreso=NULL
+-- Resultado esperado: la internación se actualiza sin problemas.
 BEGIN;
 
 UPDATE internacion SET fecha_egreso = '2026-11-10' WHERE id = 107;
@@ -358,6 +360,7 @@ ROLLBACK;
 
 -- Excepción: actualizar internación sin egreso con fecha anterior
 -- internacion id=108 tiene fecha_ingreso='2026-11-05', fecha_egreso=NULL
+-- Resultado esperado: se lanza una excepción indicando que la fecha de egreso no puede ser anterior a la de ingreso.
 BEGIN;
 
 UPDATE internacion SET fecha_egreso = '2026-11-04' WHERE id = 108;
@@ -370,6 +373,7 @@ ROLLBACK;
 -- Base: agregar enfermero a servicio con cupo
 -- servicio 60 (Pediatría general, max 2 enfermeros, actual 0 enfermeros)
 -- enfermero 541026060241 (Elisa Caballero) tiene Pediatría, NO está en personal_servicio
+-- Resultado esperado: el nuevo personal es asignado correctamente.
 BEGIN;
 
 INSERT INTO personal_servicio (id_servicio, matricula_personal) VALUES (60, '541026060241');
@@ -379,6 +383,7 @@ ROLLBACK;
 -- Excepción: agregar médico a servicio sin cupo
 -- servicio 8 (Medicina General, max 1 médico, actual 1 médico: 541016446866)
 -- médico 541018990279 (Yunnuel Arevalo) tiene Medicina General, NO está en personal_servicio
+-- Resultado esperado: se indica que ya no hay cupo para nuevo personal del tipo (médico o enfermero) ingresado.
 BEGIN;
 
 INSERT INTO personal_servicio (id_servicio, matricula_personal) VALUES (8, '541018990279');
@@ -391,6 +396,7 @@ ROLLBACK;
 -- Base: agregar enfermero CON especialidades requeridas
 -- servicio 30 (Neurología, max 2 enfermeros, actual 0 enfermeros) requiere Neurología
 -- enfermero 541038950382 (Luis Bravo) tiene Neurología, NO está en personal_servicio
+-- Resultado esperado: el nuevo personal se agrega correctamente al servicio.
 BEGIN;
 
 INSERT INTO personal_servicio (id_servicio, matricula_personal) VALUES (30, '541038950382');
@@ -400,6 +406,7 @@ ROLLBACK;
 -- Excepción: agregar enfermero SIN especialidades requeridas
 -- servicio 30 (Neurología) requiere Neurología
 -- enfermero 541026060241 (Elisa Caballero) tiene Pediatría, NO tiene Neurología, NO está en personal_servicio
+-- Resultado esperado: se lanza una excepción diciendo que el personal no cumple con las especialidades requeridas y cuales son.
 BEGIN;
 
 INSERT INTO personal_servicio (id_servicio, matricula_personal) VALUES (30, '541026060241');
@@ -413,6 +420,7 @@ ROLLBACK;
 -- enfermero 541021704836 (Nelly Leyva) está en servicio 10 (Pediatría general)
 -- servicio 10 horarios: Miércoles 08-12, Domingo 10-18, Sábado 15-21
 -- servicio 66 (Pediatría general) horarios: Martes 18-23, Domingo 18-23 (límite 18 no superpone con 10-18)
+-- Resultado esperado: el empleado es asignado correctamente.
 BEGIN;
 
 INSERT INTO personal_servicio (id_servicio, matricula_personal) VALUES (66, '541021704836');
@@ -423,6 +431,7 @@ ROLLBACK;
 -- mismo enfermero 541021704836 en servicio 10
 -- servicio 68 (Pediatría general) horarios: Martes 10-18, Sábado 14-20
 -- Superposición con servicio 10 en Sábado (15-21 vs 14-20)
+-- Resultado esperado: se activa una excepción indicando que ya trabaja en otro servicio cuyos horarios se superponen con el servicio donde se lo quiere incluir.
 BEGIN;
 
 INSERT INTO personal_servicio (id_servicio, matricula_personal) VALUES (68, '541021704836');
@@ -434,26 +443,31 @@ ROLLBACK;
 -- -----------------------------------------------
 -- vw_servicios_abiertos (vw_dias_atencion_servicio_centro)
 -- Servicios abiertos ahora con centro, dirección y horario de cierre
+-- Resultado esperado: se devuelve el listado con los servicios disponibles junto con su centro de salud, dirección y horario de cierre.
 SELECT * FROM vw_servicios_abiertos;
 
 -- -----------------------------------------------
 -- vw_historial_internacion
 -- Historial completo de internaciones ordenado por fecha ingreso
+-- Resultado esperado: se listan todas las internaciones pasadas y activas ordenadas cronológicamente por su fecha de ingreso.
 SELECT * FROM vw_historial_internacion;
 
 -- -----------------------------------------------
 -- vw_medico_mas_pacientes
 -- Médico con más pacientes por centro, ordenado por barrio
+-- Resultado esperado: se muestra de cada centro de salud el médico que más pacientes atendió, organizados por barrio.
 SELECT * FROM vw_medico_mas_pacientes;
 
 -- -----------------------------------------------
 -- vw_top10_pacientes_ingresos
 -- Top 10 pacientes con más ingresos en el último mes
+-- Resultado esperado: se devuelven los 10 pacientes con la mayor cantidad de visitas e ingresos registrados en ese período.
 SELECT * FROM vw_top10_pacientes_ingresos;
 
 -- -----------------------------------------------
 -- vw_historia_clinica_consolidada
 -- Historia clínica consolidada: visitas, internaciones, centro y servicio más frecuentado, obra social
+-- Resultado esperado: se devuelven los pacientes con sus métricas de atenciones, internaciones, centro más frecuentado, servicio más utilizado y su obra social.
 SELECT * FROM vw_historia_clinica_consolidada;
 
 -- Tests funciones
@@ -464,6 +478,7 @@ SELECT * FROM vw_historia_clinica_consolidada;
 
 -- Test 1: Diagnóstico existente con pacientes en 3 ciudades
 -- Diagnóstico único para test: "Test Bronquiolitis Aguda"
+-- Resultado esperado: 3 filas, una por ciudad, con la cantidad correcta de cada una.
 BEGIN;
 
 -- Crear 3 ciudades en distintos departamentos
@@ -504,6 +519,7 @@ ROLLBACK;
 
 -- Test 2: Diagnóstico que existe solo en una ciudad
 -- Diagnóstico único para test: "Test Caídas Repetidas"
+-- Resultado esperado: 1 fila con la cantidad de la ciudad correspondiente.
 BEGIN;
 
 INSERT INTO departamento (id, nombre) OVERRIDING SYSTEM VALUE VALUES (9010, 'Depto Test Solo');
@@ -529,6 +545,7 @@ ROLLBACK;
 
 -- Test 3: Diagnóstico con una ciudad que tiene 0 pacientes con ese diagnóstico
 -- Diagnóstico "Oncología" (probablemente no hay)
+-- Resultado esperado: la ciudad no aparece en el resultado (0 filas).
 BEGIN;
 
 SELECT * FROM fnc_pacientes_por_diagnostico('Oncología');
@@ -542,6 +559,7 @@ ROLLBACK;
 -- Test 1: Servicio abierto ahora en 2 centros
 -- Tipo servicio único para test: "Pediatría General Test"
 -- Usamos día/hora fijos para test determinista: Miércoles 10:00
+-- Resultado esperado: aparecen los 2 centros.
 BEGIN;
 
 INSERT INTO tipo_servicio (nombre, num_enfermeros, num_medicos) VALUES ('Pediatría General Test', 1, 1);
